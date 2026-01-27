@@ -1,0 +1,8 @@
+{
+  "tcgplayer_username": "",
+  "default_markup": 15,
+  "email_address": "your_email@gmail.com",
+  "email_password": "your_gmail_app_password_here",
+  "imap_server": "imap.gmail.com",
+  "auto_scan": "interval"
+}

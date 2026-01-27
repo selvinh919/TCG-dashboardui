@@ -1,0 +1,2050 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>TCG Inventory Dashboard v2.2</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<style>
+body { background:#0f0f0f; color:#eaeaea; font-family:Arial; margin:0; padding:20px; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+td, th { padding:8px; border-bottom:1px solid #333; }
+th { background:#1a1a1a; text-align:left; }
+img { width:48px; cursor:pointer; }
+.image-cell { position:relative; }
+.image-preview { display:none; position:absolute; left:100%; top:50%; transform:translateY(-50%); z-index:9999; height:200px; width:auto; margin-left:20px; box-shadow:0 0 20px rgba(0,0,0,0.9); border:2px solid #444; border-radius:8px; }
+.image-cell:hover .image-preview { display:block; }
+.good { background:#0d2a17; }
+.danger { background:#3a0d0d; }
+.stats { display:flex; gap:20px; margin-bottom:20px; }
+.stats div { padding:15px 20px; background:#1a1a1a; border-radius:8px; flex:1; }
+.stats strong { font-size:20px; color:#4a8a4a; }
+.controls { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+input[type="text"], input[type="number"] { padding:8px; background:#1a1a1a; color:#eaeaea; border:1px solid #444; border-radius:4px; }
+input[type="text"] { width:300px; }
+select { padding:8px; background:#1a1a1a; color:#eaeaea; border:1px solid #444; border-radius:4px; }
+a { color:#8ab4f8; text-decoration:none; }
+a:hover { text-decoration:underline; }
+button { padding:8px 16px; background:#1a1a1a; color:#eaeaea; border:1px solid #444; border-radius:4px; cursor:pointer; transition:all 0.2s; }
+button:hover { background:#2a2a2a; }
+button:disabled { background:#333; color:#666; cursor:not-allowed; }
+#syncBtn { background:#1a4a1a; border-color:#2a6a2a; font-weight:bold; }
+#syncBtn:hover:not(:disabled) { background:#2a5a2a; }
+.sync-status { padding:12px; background:#1a1a1a; border-radius:6px; margin-bottom:20px; text-align:center; }
+.sync-status.success { background:#0d2a17; color:#4a8a4a; }
+.sync-status.error { background:#3a0d0d; color:#ff6666; }
+.pending-section { background:#1a1a1a; padding:20px; border-radius:8px; margin-bottom:20px; max-height:500px; overflow-y:auto; }
+.pending-section h3 { margin-top:0; color:#f8ab4a; }
+.pending-product { display:flex; gap:12px; padding:12px; background:#0f0f0f; border:1px solid #333; border-radius:6px; margin-bottom:10px; align-items:center; }
+.pending-product .image-cell { position:relative; }
+.pending-product .image-cell img:first-child { width:48px; cursor:pointer; }
+.pending-product-info { flex:1; }
+.pending-product-info strong { display:block; margin-bottom:4px; }
+.pending-product-info small { color:#888; display:block; font-size:12px; }
+.pending-prices { display:flex; gap:15px; flex-wrap:wrap; align-items:flex-start; }
+.price-group { display:flex; flex-direction:column; }
+.price-group label { font-size:11px; color:#888; margin-bottom:4px; }
+.price-group input { width:70px; padding:4px 8px; }
+.pending-actions { display:flex; gap:6px; flex-direction:column; }
+.add-btn { background:#1a4a1a; border-color:#2a6a2a; padding:8px 16px; white-space:nowrap; }
+.add-btn:hover { background:#2a5a2a; }
+.remove-btn { background:#4a1a1a; border-color:#6a2a2a; padding:6px 12px; }
+.remove-btn:hover { background:#5a2a2a; }
+.add-product-section { background:#1a1a1a; padding:20px; border-radius:8px; margin-bottom:20px; }
+.add-product-section h3 { margin-top:0; color:#8ab4f8; }
+.search-results { margin-top:15px; max-height:400px; overflow-y:auto; }
+.product-result { display:flex; gap:12px; padding:10px; background:#0f0f0f; border:1px solid #333; border-radius:6px; margin-bottom:8px; align-items:center; transition:all 0.2s; }
+.product-result:hover { border-color:#555; background:#1a1a1a; }
+.product-result .image-cell { position:relative; }
+.product-result .image-cell img:first-child { width:48px; cursor:pointer; }
+.product-result-info { flex:1; }
+.product-result-info strong { display:block; margin-bottom:4px; }
+.product-result-info small { color:#888; display:block; font-size:12px; }
+.product-result-price { text-align:right; margin-right:10px; }
+.product-result-price strong { color:#4a8a4a; font-size:16px; display:block; }
+.product-result-price small { color:#888; font-size:11px; }
+.loading-spinner { color:#8ab4f8; font-size:14px; padding:20px; text-align:center; }
+.ebay-links { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.ebay-links a { font-size:11px; padding:4px 8px; background:#1a2a3a; border-radius:4px; text-align:center; text-decoration:none; }
+.ebay-links a:hover { background:#2a3a4a; }
+.percent-input { display:flex; gap:4px; align-items:center; }
+.percent-input input { width:50px; }
+.percent-input button { padding:2px 8px; font-size:11px; }
+.autocomplete-dropdown { position:absolute; top:100%; left:0; right:0; background:#1a1a1a; border:1px solid #444; border-top:none; border-radius:0 0 4px 4px; max-height:300px; overflow-y:auto; z-index:1000; display:none; margin-top:-1px; }
+.autocomplete-dropdown.show { display:block; }
+.autocomplete-item { padding:10px 12px; cursor:pointer; border-bottom:1px solid #333; transition:background 0.2s; font-size:13px; }
+.autocomplete-item:hover { background:#2a2a2a; }
+.autocomplete-item:last-child { border-bottom:none; }
+.autocomplete-item strong { color:#8ab4f8; }
+.autocomplete-item small { color:#888; margin-left:8px; }
+.search-input-wrapper { position:relative; flex:1; }
+.ebay-list-btn { background:#e5a83b; color:#000; font-weight:bold; padding:6px 12px; border:none; border-radius:4px; cursor:pointer; font-size:11px; }
+.ebay-list-btn:hover { background:#f5b84b; }
+.ebay-modal { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; }
+.ebay-modal.show { display:flex; }
+.ebay-modal-content { background:#1a1a1a; padding:25px; border-radius:8px; max-width:500px; width:90%; border:2px solid #444; }
+.ebay-modal-content h3 { margin-top:0; color:#e5a83b; }
+.ebay-form-group { margin-bottom:15px; }
+.ebay-form-group label { display:block; margin-bottom:5px; color:#888; font-size:13px; }
+.ebay-form-group input, .ebay-form-group select, .ebay-form-group textarea { width:100%; padding:8px; background:#0f0f0f; color:#eaeaea; border:1px solid #444; border-radius:4px; }
+.ebay-form-group textarea { height:80px; resize:vertical; }
+.ebay-modal-actions { display:flex; gap:10px; margin-top:20px; }
+.ebay-modal-actions button { flex:1; padding:10px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; }
+.ebay-submit-btn { background:#e5a83b; color:#000; }
+.ebay-submit-btn:hover { background:#f5b84b; }
+.ebay-cancel-btn { background:#4a1a1a; color:#eaeaea; }
+.ebay-cancel-btn:hover { background:#5a2a2a; }
+.nav-tabs { display:flex; gap:5px; margin-bottom:25px; border-bottom:2px solid #333; }
+.nav-tab { padding:12px 24px; background:#1a1a1a; border:none; border-radius:8px 8px 0 0; color:#888; cursor:pointer; font-size:15px; font-weight:bold; transition:all 0.2s; border:2px solid transparent; border-bottom:none; margin-bottom:-2px; }
+.nav-tab:hover { color:#eaeaea; background:#2a2a2a; }
+.nav-tab.active { background:#0f0f0f; color:#8ab4f8; border-color:#333; border-bottom:2px solid #0f0f0f; }
+.page-content { display:none; }
+.page-content.active { display:block; }
+.sold-item { background:#1a2a1a; border-left:3px solid #4a8a4a; }
+.pending-sales-banner { position:fixed; bottom:0; left:0; right:0; background:linear-gradient(135deg, #1a4a1a 0%, #0d2a17 100%); border-top:3px solid #4a8a4a; z-index:9999; max-height:50vh; overflow-y:auto; box-shadow:0 -4px 20px rgba(0,0,0,0.5); }
+.pending-sales-header { display:flex; align-items:center; justify-content:space-between; padding:15px 20px; background:#0d2a17; border-bottom:1px solid #2a6a2a; }
+.pending-sales-header h4 { margin:0; color:#4a8a4a; font-size:16px; display:flex; align-items:center; gap:10px; }
+.pending-sale-item { display:flex; gap:15px; padding:15px 20px; border-bottom:1px solid #2a6a2a; align-items:center; background:#1a4a1a; transition:background 0.2s; }
+.pending-sale-item:hover { background:#2a5a2a; }
+.pending-sale-item img { width:60px; height:auto; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+.pending-sale-info { flex:1; }
+.pending-sale-info strong { color:#eaeaea; font-size:15px; display:block; margin-bottom:5px; }
+.pending-sale-info small { color:#aaa; font-size:12px; display:block; }
+.pending-sale-actions { display:flex; gap:8px; }
+.confirm-btn { background:#4a8a4a; color:#fff; padding:8px 20px; border:none; border-radius:4px; font-weight:bold; cursor:pointer; transition:all 0.2s; }
+.confirm-btn:hover { background:#5aaa5a; transform:translateY(-1px); }
+.dismiss-btn { background:#4a1a1a; color:#eaeaea; padding:8px 16px; border:1px solid #6a2a2a; border-radius:4px; cursor:pointer; transition:all 0.2s; }
+.dismiss-btn:hover { background:#5a2a2a; }
+.scan-email-btn { background:#2a4a6a; color:#eaeaea; padding:8px 16px; border:1px solid #4a6a8a; border-radius:4px; cursor:pointer; font-weight:bold; transition:all 0.2s; }
+.scan-email-btn:hover { background:#3a5a7a; }
+.pending-badge { background:#ff6b6b; color:#fff; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h2>📦 TCG Inventory Dashboard</h2>
+
+<!-- Navigation Tabs -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="switchPage('inventory')">📦 Inventory</button>
+  <button class="nav-tab" onclick="switchPage('sold')">✅ Sold Items</button>
+  <button class="nav-tab" onclick="switchPage('analytics')">📊 Analytics</button>
+  <button class="nav-tab" onclick="switchPage('settings')">⚙️ Settings</button>
+</div>
+
+<!-- Pending Sales Banner (Sticky Bottom Notification) -->
+<div id="pendingSalesBanner" class="pending-sales-banner" style="display:none;">
+  <div class="pending-sales-header">
+    <h4>
+      🔔 New Sales Detected! 
+      <span id="pendingSalesCount" class="pending-badge">0</span>
+    </h4>
+    <div style="display:flex; gap:10px;">
+      <button class="scan-email-btn" onclick="scanEmails()">📧 Scan Emails</button>
+      <button class="dismiss-btn" onclick="dismissAllPendingSales()">Dismiss All</button>
+    </div>
+  </div>
+  <div id="pendingSalesList"></div>
+</div>
+
+<!-- Inventory Page -->
+<div id="inventoryPage" class="page-content active">
+<div style="display:flex; gap:10px; margin-bottom:20px;">
+  <button id="syncBtn" onclick="syncInventory()" style="flex:1; padding:10px; background:#1a4a1a; border:1px solid #2a6a2a; border-radius:4px; color:#eaeaea; cursor:pointer; font-weight:bold;">🔄 Sync Inventory</button>
+</div>
+<div id="syncStatus" class="sync-status" style="display:none;"></div>
+
+<div class="pending-section">
+  <h3>📋 Pending Products (Set Prices Before Adding)</h3>
+  <div id="pendingList"><p style="color:#888;">Loading...</p></div>
+</div>
+
+<div class="add-product-section">
+  <h3>➕ Search Products to Add</h3>
+  <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+    <select id="gameSelect" style="width:150px;">
+      <option value="pokemon">Pokémon</option>
+      <option value="magic">Magic: The Gathering</option>
+      <option value="yugioh">Yu-Gi-Oh!</option>
+      <option value="lorcana">Disney Lorcana</option>
+      <option value="flesh-and-blood">Flesh and Blood</option>
+      <option value="one-piece">One Piece</option>
+    </select>
+    <div class="search-input-wrapper">
+      <input type="text" id="productSearchInput" placeholder="Search for cards (e.g., 'Charizard', '004')" autocomplete="off">
+      <div id="autocompleteDropdown" class="autocomplete-dropdown"></div>
+    </div>
+    <button onclick="searchProducts()">🔍 Search</button>
+  </div>
+  <div id="searchResults" class="search-results">
+    <p style="color:#888;">Select a game and enter a product name to search</p>
+  </div>
+</div>
+
+<div class="stats" id="statsDiv">
+  <div>Ask: <strong id="totalAsk">$0.00</strong></div>
+  <div>Market: <strong id="totalMarket">$0.00</strong></div>
+  <div>Δ: <strong id="totalDelta">$0.00</strong></div>
+</div>
+
+<div class="controls">
+  <input type="text" id="searchInput" placeholder="Search inventory..." onkeyup="filterTable()">
+  <select id="viewFilter" onchange="filterTable()">
+    <option value="all">Show All</option>
+    <option value="singles">Show Singles</option>
+    <option value="sealed">Show Sealed</option>
+  </select>
+  <select id="sortFilter" onchange="filterTable()">
+    <option value="none">Sort by...</option>
+    <option value="name">Name</option>
+    <option value="price">Price (High to Low)</option>
+    <option value="delta">Profit (High to Low)</option>
+  </select>
+  <button id="syncBtn" onclick="syncData()">🔄 Sync</button>
+</div>
+
+<div id="syncStatus" class="sync-status" style="display:none;"></div>
+
+<table>
+<thead>
+<tr>
+<th>Image</th><th>Card Name</th><th>Qty</th><th>Cost/ea</th><th>Cost Total</th><th>Ask</th><th>Market</th><th>eBay Low</th><th>Δ</th><th>Actions</th>
+</tr>
+</thead>
+<tbody id="inventoryTable">
+<tr><td colspan="10" style="text-align:center; padding:40px; color:#888;">Loading inventory...</td></tr>
+</tbody>
+</table>
+</div><!-- End Inventory Page -->
+
+<!-- Sold Items Page -->
+<div id="soldPage" class="page-content">
+  <div style="display:flex; gap:10px; margin-bottom:20px; align-items:center;">
+    <h3 style="margin:0; color:#4a8a4a;">✅ Sold Items History</h3>
+    <button onclick="clearSoldHistory()" style="margin-left:auto; padding:8px 16px; background:#4a1a1a; border:1px solid #6a2a2a;">🗑️ Clear History</button>
+  </div>
+  
+  <div class="stats" id="soldStatsDiv">
+    <div>Total Sold: <strong id="totalSoldCount">0</strong></div>
+    <div>Revenue: <strong id="totalRevenue">$0.00</strong></div>
+    <div>Cost: <strong id="totalCost">$0.00</strong></div>
+    <div>Profit: <strong id="totalProfit" style="color:#4a8a4a;">$0.00</strong></div>
+  </div>
+  
+  <div class="controls">
+    <input type="text" id="soldSearchInput" placeholder="Search sold items..." onkeyup="filterSoldTable()">
+    <select id="soldDateFilter" onchange="filterSoldTable()">
+      <option value="all">All Time</option>
+      <option value="today">Today</option>
+      <option value="week">Last 7 Days</option>
+      <option value="month">Last 30 Days</option>
+    </select>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Date Sold</th><th>Image</th><th>Card Name</th><th>Qty</th><th>Cost/ea</th><th>Sell Price</th><th>Profit</th><th>Platform</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="soldTable">
+      <tr><td colspan="9" style="text-align:center; padding:40px; color:#888;">No sold items yet</td></tr>
+    </tbody>
+  </table>
+</div><!-- End Sold Page -->
+
+<!-- Analytics Page -->
+<div id="analyticsPage" class="page-content">
+  <h3 style="color:#8ab4f8;">📊 Analytics</h3>
+  <p style="color:#888;">Coming soon: Sales trends, profit margins, best sellers, and more...</p>
+</div>
+
+<!-- Settings Page -->
+<div id="settingsPage" class="page-content">
+  <h3 style="color:#8ab4f8;">⚙️ Settings</h3>
+  
+  <div class="ebay-form-group">
+    <label>TCGPlayer Username</label>
+    <input type="text" id="settingsTcgUsername" placeholder="Your TCGPlayer store username">
+    <small style="color:#888; font-size:11px;">Your TCGPlayer store username for inventory sync</small>
+  </div>
+  
+  <div class="ebay-form-group">
+    <label>Default Markup Percentage</label>
+    <input type="number" id="settingsMarkup" value="15" min="0" step="1">
+    <small style="color:#888; font-size:11px;">Default markup when adding new items</small>
+  </div>
+  
+  <hr style="border:none; border-top:1px solid #333; margin:25px 0;">
+  
+  <h4 style="color:#4a8a4a;">📧 Email Integration (Auto-detect Sales)</h4>
+  
+  <div class="ebay-form-group">
+    <label>Email Address</label>
+    <input type="email" id="settingsEmailAddress" placeholder="your_email@gmail.com">
+    <small style="color:#888; font-size:11px;">Email where you receive TCGPlayer sale notifications</small>
+  </div>
+  
+  <div class="ebay-form-group">
+    <label>Email Password / App Password</label>
+    <div style="position:relative;">
+      <input type="password" id="settingsEmailPassword" placeholder="Your app password" style="padding-right:45px;">
+      <button type="button" onclick="togglePasswordVisibility()" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:18px; padding:5px;" title="Toggle password visibility">
+        👁️
+      </button>
+    </div>
+    <small style="color:#888; font-size:11px;">
+      <strong style="color:#f4b942;">⚠️ Gmail Users:</strong> You MUST use an App Password (not your regular Gmail password)<br>
+      1. Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#8ab4f8;">myaccount.google.com/apppasswords</a><br>
+      2. Select "Mail" → "Other (Custom name)" → Type "TCG Dashboard"<br>
+      3. Copy the 16-character password (spaces will be automatically removed)<br>
+      4. Paste it here and click Save Settings<br>
+      <br>
+      <strong>Other providers:</strong> Regular password usually works (Outlook, Yahoo, etc.)
+    </small>
+  </div>
+  
+  <div class="ebay-form-group">
+    <label>IMAP Server</label>
+    <select id="settingsImapServer">
+      <option value="imap.gmail.com">Gmail (imap.gmail.com)</option>
+      <option value="outlook.office365.com">Outlook/Office 365</option>
+      <option value="imap.mail.yahoo.com">Yahoo Mail</option>
+      <option value="imap.aol.com">AOL Mail</option>
+      <option value="custom">Custom IMAP Server</option>
+    </select>
+  </div>
+  
+  <div class="ebay-form-group" id="customImapGroup" style="display:none;">
+    <label>Custom IMAP Server Address</label>
+    <input type="text" id="settingsCustomImap" placeholder="imap.example.com">
+  </div>
+  
+  <div class="ebay-form-group">
+    <label>Auto-scan Email</label>
+    <select id="settingsAutoScan">
+      <option value="manual">Manual Only</option>
+      <option value="startup">On Dashboard Load</option>
+      <option value="interval">Every 5 Minutes</option>
+    </select>
+    <small style="color:#888; font-size:11px;">Automatically check for new sale emails</small>
+  </div>
+  
+  <div style="display:flex; gap:10px; margin-top:20px;">
+    <button onclick="saveSettings()" class="ebay-submit-btn">💾 Save Settings</button>
+    <button onclick="testEmailConnection()" class="scan-email-btn">🔍 Test Email Connection</button>
+    <button onclick="scanEmails()" class="scan-email-btn">📧 Scan Emails Now</button>
+  </div>
+</div>
+
+<!-- Sale Confirmation Modal -->
+<div id="saleConfirmModal" class="ebay-modal">
+  <div class="ebay-modal-content">
+    <h3>✅ Confirm Sale</h3>
+    <div id="saleConfirmDetails" style="margin:20px 0;"></div>
+    
+    <div class="ebay-form-group">
+      <label>Cost Per Item</label>
+      <input type="number" id="confirmCost" step="0.01" placeholder="Your cost" oninput="updateProfitDisplay()">
+      <small style="color:#888;">What you paid for this item</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Sold Price Per Item</label>
+      <input type="number" id="confirmSoldPrice" step="0.01" placeholder="Enter sold price" oninput="updateProfitDisplay()">
+      <small style="color:#888;">⚠️ Auto-calculated from order total - Edit if needed</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Quantity Sold</label>
+      <input type="number" id="confirmQuantity" min="1" readonly>
+    </div>
+    
+    <div id="confirmProfit" style="margin:15px 0; padding:10px; background:#1a2332; border-radius:4px; font-size:16px;">
+      <strong>Profit:</strong> <span id="profitAmount" style="color:#4ade80;">$0.00</span>
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-top:20px;">
+      <button onclick="finalizeConfirmSale()" class="ebay-submit-btn" style="flex:1;">✅ Confirm & Mark Sold</button>
+      <button onclick="closeSaleConfirmModal()" class="ebay-cancel-btn" style="flex:1;">❌ Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- eBay Listing Modal -->
+<div id="ebayModal" class="ebay-modal">
+  <div class="ebay-modal-content">
+    <h3>📦 List on eBay</h3>
+    <div id="ebayProductName" style="margin-bottom:15px; color:#8ab4f8;"></div>
+    
+    <div class="ebay-form-group">
+      <label>Listing Price ($)</label>
+      <input type="number" id="ebayPrice" step="0.01" min="0" placeholder="0.00">
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Quantity</label>
+      <input type="number" id="ebayQuantity" min="1" value="1">
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Card Condition</label>
+      <select id="ebayCondition">
+        <option value="Near mint or better">Near mint or better</option>
+        <option value="Lightly played (Excellent)">Lightly played (Excellent)</option>
+        <option value="Moderately played (Very good)">Moderately played (Very good)</option>
+        <option value="Heavily played (Poor)">Heavily played (Poor)</option>
+      </select>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Shipping</label>
+      <select id="ebayShipping">
+        <option value="standard_envelope">eBay Standard Envelope (Under $20)</option>
+        <option value="buyer_pays">Buyer Pays Shipping (Over $20)</option>
+      </select>
+      <small style="color:#888; font-size:11px;">Auto-selected based on price</small>
+    </div>
+    
+    <div class="ebay-modal-actions">
+      <button class="ebay-cancel-btn" onclick="closeEbayModal()">Cancel</button>
+      <button class="ebay-submit-btn" onclick="submitEbayListing()">🚀 List on eBay</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="ebay-modal">
+  <div class="ebay-modal-content" style="max-width:600px;">
+    <h3>⚙️ Settings</h3>
+    
+    <div class="ebay-form-group">
+      <label>TCGPlayer Username</label>
+      <input type="text" id="settingsTcgUsername" placeholder="YourTCGPlayerUsername">
+      <small style="color:#888; font-size:11px;">Your TCGPlayer store username (will auto-find your store URL)</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Postal/Zip Code</label>
+      <input type="text" id="settingsPostalCode" placeholder="10001">
+      <small style="color:#888; font-size:11px;">Used for shipping calculations</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Default Shipping Cost ($)</label>
+      <input type="number" id="settingsShippingCost" step="0.01" min="0" value="4.99">
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Default Shipping Service</label>
+      <select id="settingsShippingService">
+        <option value="USPSPriority">USPS Priority Mail</option>
+        <option value="USPSFirstClass">USPS First Class</option>
+        <option value="USPSPriorityFlatRate">USPS Priority Flat Rate</option>
+      </select>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Handling Time (days)</label>
+      <input type="number" id="settingsHandlingDays" min="1" value="1">
+      <small style="color:#888; font-size:11px;">Days until you ship after sale</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>eBay Campaign ID</label>
+      <input type="text" id="settingsEbayCampaign" placeholder="5339137036">
+      <small style="color:#888; font-size:11px;">Your eBay Partner Network campaign ID</small>
+    </div>
+    
+    <hr style="border:none; border-top:1px solid #333; margin:20px 0;">
+    <h4 style="color:#8ab4f8; margin-bottom:10px;">📦 eBay Business Policies (Inventory API)</h4>
+    <small style="color:#888; display:block; margin-bottom:10px;">Get these from: <a href="https://www.ebay.com/sh/ovw/business" target="_blank" style="color:#8ab4f8;">eBay Business Policies</a></small>
+    
+    <div class="ebay-form-group">
+      <label>Fulfillment Policy ID</label>
+      <input type="text" id="settingsFulfillmentPolicy" placeholder="Enter your Fulfillment Policy ID">
+      <small style="color:#888; font-size:11px;">Required for eBay Standard Envelope shipping</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Payment Policy ID</label>
+      <input type="text" id="settingsPaymentPolicy" placeholder="Enter your Payment Policy ID">
+      <small style="color:#888; font-size:11px;">Payment method policy</small>
+    </div>
+    
+    <div class="ebay-form-group">
+      <label>Return Policy ID</label>
+      <input type="text" id="settingsReturnPolicy" placeholder="Enter your Return Policy ID">
+      <small style="color:#888; font-size:11px;">Return policy for listings</small>
+    </div>
+    
+    <hr style="border:none; border-top:1px solid #333; margin:20px 0;">
+    
+    <div class="ebay-form-group">
+      <label>🔍 Get eBay Category Requirements (via API)</label>
+      <input type="text" id="ebayAnalyzeCategory" placeholder="183454" value="183454">
+      <small style="color:#888; font-size:11px;">Category ID (183454 = CCG Individual Cards)</small>
+      <button class="ebay-submit-btn" onclick="analyzeEbayRequirements()" style="margin-top:8px; width:100%;">📊 Get Requirements</button>
+      <div id="ebayAnalyzeResult" style="margin-top:8px; font-size:12px;"></div>
+    </div>
+    
+    <div class="ebay-modal-actions">
+      <button class="ebay-cancel-btn" onclick="closeSettingsModal()">Cancel</button>
+      <button class="ebay-submit-btn" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const EBAY_CAMPAIGN_ID = '5339137036';
+let pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+let inventoryData = [];
+let tcgWindowRef = null;
+let autocompleteTimeout = null;
+let lastSearchResults = [];  // Cache for instant local filtering
+let autocompleteController = null;  // For cancelling in-flight requests
+
+// Autocomplete functionality
+function initAutocomplete() {
+  const searchInput = document.getElementById('productSearchInput');
+  const dropdown = document.getElementById('autocompleteDropdown');
+  
+  searchInput.addEventListener('input', function(e) {
+    const query = e.target.value.trim();
+    
+    clearTimeout(autocompleteTimeout);
+    
+    // Cancel any in-flight autocomplete request
+    if (autocompleteController) {
+      autocompleteController.abort();
+      autocompleteController = null;
+    }
+    
+    if (query.length < 2) {
+      dropdown.classList.remove('show');
+      return;
+    }
+    
+    // Debounce: wait 1000ms (increased from 300ms to reduce server load)
+    autocompleteTimeout = setTimeout(() => {
+      showAutocompleteSuggestions(query);
+    }, 1000);
+  });
+  
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      dropdown.classList.remove('show');
+      clearTimeout(autocompleteTimeout);
+      if (autocompleteController) {
+        autocompleteController.abort();
+        autocompleteController = null;
+      }
+      searchProducts();
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('show');
+    }
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-input-wrapper')) {
+      dropdown.classList.remove('show');
+    }
+  });
+}
+
+function showAutocompleteSuggestions(query) {
+  const dropdown = document.getElementById('autocompleteDropdown');
+  const game = document.getElementById('gameSelect').value;
+  
+  // Show loading hint
+  dropdown.innerHTML = '<div class="autocomplete-item" style="color:#888;">Type and press Enter to search...</div>';
+  dropdown.classList.add('show');
+  
+  // Create abort controller for this request
+  autocompleteController = new AbortController();
+  
+  // Only fetch from cache - don't trigger scraping on autocomplete
+  fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&game=${encodeURIComponent(game)}`, {
+    signal: autocompleteController.signal
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.suggestions && data.suggestions.length > 0) {
+        displaySuggestions(data.suggestions);
+      } else {
+        // Don't show empty - just hide dropdown
+        dropdown.classList.remove('show');
+      }
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        // Request was cancelled, ignore
+        return;
+      }
+      console.error('Autocomplete error:', err);
+      dropdown.classList.remove('show');
+    })
+    .finally(() => {
+      autocompleteController = null;
+    });
+}
+
+function displaySuggestions(suggestions) {
+  const dropdown = document.getElementById('autocompleteDropdown');
+  
+  if (suggestions.length === 0) {
+    dropdown.classList.remove('show');
+    return;
+  }
+  
+  dropdown.innerHTML = suggestions.map(text => {
+    const parts = text.split(' - ');
+    const name = parts[0];
+    const number = parts[1] || '';
+    return `
+      <div class="autocomplete-item" onclick="selectAutocompleteSuggestion('${text.replace(/'/g, "\\'")}')"> 
+        <strong>${name}</strong>${number ? `<small>${number}</small>` : ''}
+      </div>
+    `;
+  }).join('');
+  
+  dropdown.classList.add('show');
+}
+
+function selectAutocompleteSuggestion(text) {
+  document.getElementById('productSearchInput').value = text;
+  document.getElementById('autocompleteDropdown').classList.remove('show');
+  searchProducts();
+}
+
+// Load inventory from API
+async function loadInventory() {
+  try {
+    const response = await fetch('/api/inventory');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      inventoryData = data.items;
+      
+      // Update stats
+      document.getElementById('totalAsk').textContent = `$${data.totals.ask.toFixed(2)}`;
+      document.getElementById('totalMarket').textContent = `$${data.totals.market.toFixed(2)}`;
+      const deltaColor = data.totals.delta >= 0 ? '#4a8a4a' : '#ff6666';
+      document.getElementById('totalDelta').innerHTML = `<strong style="color:${deltaColor}">$${data.totals.delta.toFixed(2)}</strong>`;
+      
+      // Render table
+      renderInventory();
+    } else {
+      document.getElementById('inventoryTable').innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#888;">No inventory data. Click Sync to load.</td></tr>';
+    }
+  } catch (error) {
+    document.getElementById('inventoryTable').innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#ff6666;">Error loading inventory. Make sure server is running.</td></tr>';
+  }
+}
+
+function renderInventory() {
+  const tbody = document.getElementById('inventoryTable');
+  const EBAY_CAMPAIGN_ID = '5339137036';
+  
+  if (inventoryData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:40px; color:#888;">No products in inventory</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = inventoryData.map(item => {
+    const name = item.display_name || item.name;
+    const price = parseFloat(item.price) || 0;
+    const market = item.market || 0;
+    const qty = item.qty || 1;
+    const costEach = item.cost || 0;  // Cost per unit
+    const costTotal = costEach * qty;  // Total cost for all units
+    const delta = market - price;
+    const tcgUrl = item.tcg_url || '';
+    const productId = item.tcg_product_id || '';
+    const image = item.image || '';
+    const rowClass = delta > 0 ? 'good' : (delta < 0 ? 'danger' : '');
+    const type = item.type || 'single';
+    
+    const cardSearchQuery = encodeURIComponent(name);
+    const ebaySearchUrl = `https://www.ebay.com/sch/i.html?_nkw=${cardSearchQuery}&LH_Sold=1&LH_Complete=1`;
+    const ebayBuyUrl = `https://www.ebay.com/sch/i.html?_nkw=${cardSearchQuery}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${EBAY_CAMPAIGN_ID}&customid=&toolid=10001&mkevt=1`;
+    const tcgEditUrl = `https://store.tcgplayer.com/admin/product/manage/${productId}`;
+    
+    return `
+    <tr class="${rowClass}" data-type="${type}">
+      <td class="image-cell">
+        ${image ? `
+          <a href="${tcgEditUrl}" target="_blank">
+            <img src="${image}" onerror="this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">
+          </a>
+          <img class="image-preview" src="${image}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+        ` : '<img src="https://via.placeholder.com/48x67?text=NO+IMAGE">'}
+      </td>
+      <td>
+        <strong>${name}</strong>
+        ${item.set_name ? `<br><small style="color:#888">${item.set_name}</small>` : ''}
+      </td>
+      <td><strong>${qty}</strong></td>
+      <td style="color:#aaa;">$${costEach.toFixed(2)}</td>
+      <td><strong style="color:#f4b942;">$${costTotal.toFixed(2)}</strong></td>
+      <td>$${price.toFixed(2)}</td>
+      <td>${market ? `$${market.toFixed(2)}` : '—'}</td>
+      <td id="ebay-price-${productId}" style="color:#f4b942;">
+        <button onclick='checkEbayPrice("${name}", "${productId}")' style="background:none; border:none; color:#8ab4f8; cursor:pointer; font-size:11px;">🔍 Check</button>
+      </td>
+      <td><strong>${delta !== 0 ? (delta > 0 ? '+' : '') + '$' + delta.toFixed(2) : '—'}</strong></td>
+      <td style="font-size:11px;">
+        <a href="${ebaySearchUrl}" target="_blank">📊 eBay Sold</a><br>
+        <a href="${ebayBuyUrl}" target="_blank">🛒 eBay Buy</a><br>
+        ${tcgUrl ? `<a href="${tcgUrl}" target="_blank">🟪 TCG</a><br>` : ''}
+        ${productId ? `<a href="${tcgEditUrl}" target="_blank">✏️ Edit</a><br>` : ''}
+        <button class="ebay-list-btn" onclick='openEbayInventoryModal(${JSON.stringify({name, set: item.set_name || 'Unknown', number: item.card_number || '1', price, market, image, productId, quantity: item.qty || 1})})' style="margin-top:4px;">📦 List eBay</button><br>
+        <button onclick='markAsSold(${JSON.stringify(item)})' style="margin-top:4px; padding:4px 8px; background:#1a4a1a; border:1px solid #2a6a2a; color:#eaeaea; font-size:11px; border-radius:4px; cursor:pointer;">✅ Sold</button>
+      </td>
+    </tr>
+    `;
+  }).join('');
+}
+
+function filterTable() {
+  const searchInput = document.getElementById('searchInput').value.toLowerCase();
+  const sortFilter = document.getElementById('sortFilter').value;
+  const viewFilter = document.getElementById('viewFilter').value;
+  const rows = Array.from(document.querySelectorAll('#inventoryTable tr'));
+  
+  rows.forEach(row => {
+    const name = row.cells[1]?.textContent.toLowerCase() || '';
+    const matchesSearch = name.includes(searchInput);
+    const productType = row.getAttribute('data-type');
+    
+    let matchesView = true;
+    if (viewFilter === 'singles') {
+      matchesView = productType === 'single';
+    } else if (viewFilter === 'sealed') {
+      matchesView = productType === 'sealed';
+    }
+    
+    row.style.display = (matchesSearch && matchesView) ? '' : 'none';
+  });
+  
+  if (sortFilter !== 'none') {
+    const tbody = document.querySelector('#inventoryTable');
+    const sortedRows = rows.sort((a, b) => {
+      if (sortFilter === 'name') {
+        return a.cells[1].textContent.localeCompare(b.cells[1].textContent);
+      } else if (sortFilter === 'price') {
+        const priceA = parseFloat(a.cells[2].textContent.replace('$', ''));
+        const priceB = parseFloat(b.cells[2].textContent.replace('$', ''));
+        return priceB - priceA;
+      } else if (sortFilter === 'delta') {
+        const deltaA = parseFloat(a.cells[4].textContent.replace(/[^0-9.-]/g, ''));
+        const deltaB = parseFloat(b.cells[4].textContent.replace(/[^0-9.-]/g, ''));
+        return deltaB - deltaA;
+      }
+      return 0;
+    });
+    sortedRows.forEach(row => tbody.appendChild(row));
+  }
+}
+
+async function syncData() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+  
+  btn.disabled = true;
+  btn.textContent = '🔄 Syncing...';
+  status.style.display = 'block';
+  status.textContent = 'Syncing inventory from TCGPlayer...';
+  status.className = 'sync-status';
+  
+  try {
+    const response = await fetch('/sync', { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      status.textContent = data.message;
+      status.className = 'sync-status success';
+      
+      // Reload inventory after 3 seconds
+      setTimeout(async () => {
+        await loadInventory();
+        btn.disabled = false;
+        btn.textContent = '🔄 Sync';
+        setTimeout(() => { status.style.display = 'none'; }, 2000);
+      }, 3000);
+    } else {
+      status.textContent = data.message;
+      status.className = 'sync-status error';
+      btn.disabled = false;
+      btn.textContent = '🔄 Sync';
+    }
+  } catch (error) {
+    status.textContent = 'Error: Could not connect to server';
+    status.className = 'sync-status error';
+    btn.disabled = false;
+    btn.textContent = '🔄 Sync';
+  }
+}
+
+async function searchProducts() {
+  const input = document.getElementById('productSearchInput');
+  const gameSelect = document.getElementById('gameSelect');
+  const resultsDiv = document.getElementById('searchResults');
+  const query = input.value.trim();
+  const game = gameSelect.value;
+  
+  if (!query) {
+    resultsDiv.innerHTML = '<p style="color:#888;">Enter a product name to search</p>';
+    return;
+  }
+  
+  resultsDiv.innerHTML = '<div class="loading-spinner">🔍 Searching TCGPlayer...</div>';
+  
+  try {
+    const response = await fetch(`/search-products?q=${encodeURIComponent(query)}&game=${game}`);
+    const data = await response.json();
+    
+    if (data.status === 'success' && data.results.length > 0) {
+      lastSearchResults = data.results;  // Cache for instant filtering
+      
+      // Show cache indicator
+      const cacheIndicator = data.cached ? '<span style="color:#4a8a4a; font-size:11px; margin-left:8px;">⚡ From cache</span>' : '';
+      
+      resultsDiv.innerHTML = data.results.map(product => `
+        <div class="product-result" 
+             data-product-id="${product.productId}"
+             data-product-name="${product.name}"
+             data-product-image="${product.imageUrl || ''}"
+             data-product-set="${product.set}"
+             data-market-price="${product.marketPrice || 0}"
+             data-lowest-price="${product.lowestPrice || 0}"
+             data-card-number="${product.number || ''}">
+          <div class="image-cell">
+            <img src="${product.imageUrl || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
+            <img class="image-preview" src="${product.imageUrl || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+          </div>
+          <div class="product-result-info">
+            <strong>${product.name}${product.number ? ' #' + product.number : ''}</strong>
+            <small>${product.set}</small>
+          </div>
+          <div class="product-result-price">
+            <strong>$${(product.marketPrice || 0).toFixed(2)}</strong>
+            <small>Market</small>
+            ${product.lowestPrice > 0 ? `<small style="color:#6a9a6a; margin-top:2px; display:block;">Low: $${product.lowestPrice.toFixed(2)}</small>` : ''}
+          </div>
+          <div class="product-result-actions">
+            <button class="add-btn add-to-pending-btn">
+              ➕ Add to List
+            </button>
+          </div>
+        </div>
+      `).join('');
+      
+      // Add event listeners
+      document.querySelectorAll('.add-to-pending-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const productDiv = this.closest('.product-result');
+          addToPending(
+            productDiv.dataset.productId,
+            productDiv.dataset.productName,
+            productDiv.dataset.productImage,
+            productDiv.dataset.productSet,
+            parseFloat(productDiv.dataset.marketPrice),
+            parseFloat(productDiv.dataset.lowestPrice),
+            productDiv.dataset.cardNumber
+          );
+        });
+      });
+    } else {
+      resultsDiv.innerHTML = '<p style="color:#888;">No results found. Try a different search term.</p>';
+    }
+  } catch (error) {
+    resultsDiv.innerHTML = '<p style="color:#ff6666;">Error searching products. Make sure the server is running.</p>';
+  }
+}
+
+function addToPending(productId, productName, productImage, productSet, marketPrice, lowestPrice, cardNumber) {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  
+  const existing = pendingProducts.find(p => p.productId === productId);
+  if (existing) {
+    existing.quantity = (existing.quantity || 1) + 1;
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    renderPendingList();
+    showNotification(`✅ Quantity updated to ${existing.quantity}`);
+    return;
+  }
+  
+  pendingProducts.push({
+    productId,
+    name: productName,
+    cardNumber: cardNumber || '',
+    image: productImage,
+    set: productSet,
+    marketPrice: marketPrice || 0,
+    lowestPrice: lowestPrice || 0,
+    costPrice: 0,
+    costPercent: 80,
+    useCostPercent: true,
+    askPrice: marketPrice || 0,
+    quantity: 1
+  });
+  
+  localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  renderPendingList();
+  showNotification('✅ Added to pending list');
+}
+
+function removeFromPending(productId) {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  pendingProducts = pendingProducts.filter(p => p.productId !== productId);
+  localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  renderPendingList();
+}
+
+function updatePendingPrice(productId, field, value) {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  const product = pendingProducts.find(p => p.productId === productId);
+  if (product) {
+    product[field] = field === 'quantity' ? parseInt(value) || 1 : parseFloat(value) || 0;
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  }
+}
+
+function toggleCostMode(productId, usePercent) {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  const product = pendingProducts.find(p => p.productId === productId);
+  if (product) {
+    product.useCostPercent = usePercent;
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    renderPendingList();
+  }
+}
+
+function updateCostPercent(productId, value) {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  const product = pendingProducts.find(p => p.productId === productId);
+  if (product) {
+    product.costPercent = parseFloat(value) || 80;
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    renderPendingList();
+  }
+}
+
+function addPendingToTCG(productId, productName) {
+  const tcgUrl = `https://store.tcgplayer.com/admin/product/manage/${productId}`;
+  
+  // Open TCGPlayer admin page and keep window reference
+  tcgWindowRef = window.open(tcgUrl, '_blank');
+  
+  // Store the product info for "Mark as Added" button
+  sessionStorage.setItem('lastAddedProductId', productId);
+  sessionStorage.setItem('lastAddedProductName', productName);
+  
+  // Show "Mark as Added" confirmation button
+  showMarkAsAddedButton(productId, productName);
+}
+
+function showMarkAsAddedButton(productId, productName) {
+  // Remove any existing confirmation
+  const existing = document.getElementById('markAddedConfirm');
+  if (existing) existing.remove();
+  
+  // Create confirmation div
+  const confirmDiv = document.createElement('div');
+  confirmDiv.id = 'markAddedConfirm';
+  confirmDiv.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#2a5a2a; color:#fff; padding:15px 20px; border-radius:8px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.5); text-align:center;';
+  confirmDiv.innerHTML = `
+    <p style="margin:0 0 10px 0;">After adding <strong>${productName}</strong> on TCGPlayer:</p>
+    <button class="add-btn" onclick="confirmProductAdded('${productId}')" style="margin-right:10px;">✅ Mark as Added</button>
+    <button class="remove-btn" onclick="document.getElementById('markAddedConfirm').remove()">Cancel</button>
+  `;
+  document.body.appendChild(confirmDiv);
+}
+
+function confirmProductAdded(productId) {
+  // Mark as added on server
+  fetch('/mark-added', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId })
+  });
+  
+  // Remove from pending list
+  removeFromPending(productId);
+  
+  // Remove confirmation button
+  const confirmDiv = document.getElementById('markAddedConfirm');
+  if (confirmDiv) confirmDiv.remove();
+  
+  // Close the TCGPlayer window if it's still open
+  if (tcgWindowRef && !tcgWindowRef.closed) {
+    tcgWindowRef.close();
+    tcgWindowRef = null;
+  }
+  
+  // Show success notification
+  showNotification('✅ Product marked as added! Click Sync to fetch it.');
+}
+
+function renderPendingList() {
+  pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  const pendingDiv = document.getElementById('pendingList');
+  
+  if (pendingProducts.length === 0) {
+    pendingDiv.innerHTML = '<p style="color:#888;">No products in pending list. Search and add products above.</p>';
+    return;
+  }
+  
+  pendingDiv.innerHTML = pendingProducts.map(product => {
+    const marketPrice = parseFloat(product.marketPrice) || 0;
+    const lowestPrice = parseFloat(product.lowestPrice) || 0;
+    const costPrice = parseFloat(product.costPrice) || 0;
+    const costPercent = parseFloat(product.costPercent) || 80;
+    const askPrice = parseFloat(product.askPrice) || marketPrice;
+    const quantity = parseInt(product.quantity) || 1;
+    const useCostPercent = product.useCostPercent !== false;
+    
+    const cardSearchQuery = encodeURIComponent(`${product.name}${product.cardNumber ? ' ' + product.cardNumber : ''}`);
+    const calculatedCost = useCostPercent 
+      ? (marketPrice * (costPercent / 100)).toFixed(2)
+      : costPrice.toFixed(2);
+    
+    return `
+    <div class="pending-product">
+      <div class="image-cell">
+        <img src="${product.image || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
+        <img class="image-preview" src="${product.image || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+      </div>
+      <div class="pending-product-info">
+        <strong>${product.name}${product.cardNumber ? ' #' + product.cardNumber : ''}</strong>
+        <small>${product.set}</small>
+        <div class="ebay-links">
+          <a href="https://www.ebay.com/sch/i.html?_nkw=${cardSearchQuery}&LH_Sold=1&LH_Complete=1" target="_blank">📊 eBay Sold</a>
+          <a href="https://www.ebay.com/sch/i.html?_nkw=${cardSearchQuery}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${EBAY_CAMPAIGN_ID}&customid=&toolid=10001&mkevt=1" target="_blank">🛒 Buy on eBay</a>
+          <a href="https://www.ebay.com/sl/sell?itemTitle=${cardSearchQuery}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${EBAY_CAMPAIGN_ID}" target="_blank">💰 Sell on eBay</a>
+        </div>
+      </div>
+      <div class="pending-prices">
+        <div class="price-group">
+          <label>Market</label>
+          <strong style="color:#4a8a4a;">$${marketPrice.toFixed(2)}</strong>
+          ${lowestPrice > 0 ? `<small style="color:#6a9a6a;">Low: $${lowestPrice.toFixed(2)}</small>` : ''}
+        </div>
+        <div class="price-group">
+          <label>Cost Price</label>
+          <div class="percent-input">
+            <input type="number" step="0.01" value="${calculatedCost}" 
+                   ${useCostPercent ? 'readonly' : ''} 
+                   onchange="updatePendingPrice('${product.productId}', 'costPrice', this.value)">
+            <button onclick="toggleCostMode('${product.productId}', false)" 
+                    style="${useCostPercent ? '' : 'background:#2a5a2a;'}">$</button>
+          </div>
+          <div class="percent-input">
+            <input type="number" step="1" value="${costPercent}" 
+                   ${useCostPercent ? '' : 'readonly'} 
+                   onchange="updateCostPercent('${product.productId}', this.value)">
+            <button onclick="toggleCostMode('${product.productId}', true)" 
+                    style="${useCostPercent ? 'background:#2a5a2a;' : ''}">%</button>
+          </div>
+        </div>
+        <div class="price-group">
+          <label>Ask Price</label>
+          <input type="number" step="0.01" value="${askPrice.toFixed(2)}" 
+                 onchange="updatePendingPrice('${product.productId}', 'askPrice', this.value)">
+        </div>
+        <div class="price-group">
+          <label>Quantity</label>
+          <input type="number" step="1" min="1" value="${quantity}" 
+                 onchange="updatePendingPrice('${product.productId}', 'quantity', this.value)">
+        </div>
+      </div>
+      <div class="pending-actions">
+        <button class="add-btn" onclick="addPendingToTCG('${product.productId}', '${product.name.replace(/'/g, "\\'")}')">
+          ➕ Add to TCGPlayer
+        </button>
+        <button class="remove-btn" onclick="removeFromPending('${product.productId}')">
+          🗑️ Remove
+        </button>
+      </div>
+    </div>
+    `;
+  }).join('');
+}
+
+function showNotification(message) {
+  const notification = document.createElement('div');
+  notification.style.cssText = 'position:fixed; top:20px; right:20px; background:#2a5a2a; color:#fff; padding:15px 20px; border-radius:6px; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 2000);
+}
+
+// eBay Listing Functions
+let currentEbayProduct = null;
+
+function openEbayModal(product) {
+  currentEbayProduct = product;
+  const price = parseFloat(product.market || product.price || 0);
+  document.getElementById('ebayProductName').textContent = product.name;
+  document.getElementById('ebayPrice').value = Math.max(0.99, price).toFixed(2);
+  document.getElementById('ebayQuantity').value = product.quantity || 1;
+  document.getElementById('ebayCondition').value = 'Near mint or better';
+  
+  // Auto-select shipping based on price
+  const shipping = price < 20 ? 'standard_envelope' : 'buyer_pays';
+  document.getElementById('ebayShipping').value = shipping;
+  
+  document.getElementById('ebayModal').classList.add('show');
+}
+
+function closeEbayModal() {
+  document.getElementById('ebayModal').classList.remove('show');
+  currentEbayProduct = null;
+}
+
+async function submitEbayListing() {
+  if (!currentEbayProduct) return;
+  
+  const submitBtn = document.querySelector('.ebay-submit-btn');
+  const originalText = submitBtn.textContent;
+  submitBtn.textContent = 'Listing...';
+  submitBtn.disabled = true;
+  
+  const listingData = {
+    name: currentEbayProduct.name,
+    price: Math.max(0.99, parseFloat(document.getElementById('ebayPrice').value) || 0),
+    quantity: parseInt(document.getElementById('ebayQuantity').value) || 1,
+    condition: document.getElementById('ebayCondition').value,
+    image: currentEbayProduct.image || '',
+    shipping_type: document.getElementById('ebayShipping').value
+  };
+  
+  try {
+    const response = await fetch('/ebay-list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(listingData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification(`✅ Listed on eBay! ItemID: ${data.item_id}`);
+      closeEbayModal();
+      
+      // Open eBay listing in new tab
+      if (data.listing_url) {
+        window.open(data.listing_url, '_blank');
+      }
+    } else {
+      showNotification(`❌ eBay Error: ${data.message}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error: ${error.message}`, true);
+  } finally {
+    submitBtn.textContent = originalText;
+    submitBtn.disabled = false;
+  }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('ebayModal');
+  if (e.target === modal) {
+    closeEbayModal();
+  }
+  const settingsModal = document.getElementById('settingsModal');
+  if (e.target === settingsModal) {
+    closeSettingsModal();
+  }
+});
+
+// eBay Price Check Function
+async function checkEbayPrice(cardName, productId) {
+  const cell = document.getElementById(`ebay-price-${productId}`);
+  cell.innerHTML = '<span style="color:#888;">⏳ Checking...</span>';
+  
+  try {
+    const response = await fetch('/ebay-price-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ search_query: cardName })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      cell.innerHTML = `<strong style="color:#f4b942;">$${data.lowest_price.toFixed(2)}</strong>`;
+    } else {
+      cell.innerHTML = '<span style="color:#666;">No data</span>';
+    }
+  } catch (error) {
+    cell.innerHTML = '<span style="color:#888;">Error</span>';
+    console.error('eBay price check error:', error);
+  }
+}
+
+// eBay Inventory API Listing Functions
+let currentInventoryProduct = null;
+
+function openEbayInventoryModal(product) {
+  currentInventoryProduct = product;
+  const price = parseFloat(product.market || product.price || 0);
+  
+  // Show modal (reuse existing one but with different submit)
+  document.getElementById('ebayProductName').textContent = `${product.name} (Inventory API)`;
+  document.getElementById('ebayPrice').value = Math.max(0.99, price).toFixed(2);
+  document.getElementById('ebayQuantity').value = product.quantity || 1;
+  document.getElementById('ebayCondition').value = 'Near mint or better';
+  
+  // Auto-select shipping based on price
+  const shipping = price < 20 ? 'standard_envelope' : 'buyer_pays';
+  document.getElementById('ebayShipping').value = shipping;
+  
+  document.getElementById('ebayModal').classList.add('show');
+  
+  // Change submit button behavior temporarily
+  const submitBtn = document.querySelector('.ebay-submit-btn');
+  submitBtn.onclick = submitEbayInventoryListing;
+}
+
+async function submitEbayInventoryListing() {
+  if (!currentInventoryProduct) return;
+  
+  const submitBtn = document.querySelector('.ebay-submit-btn');
+  const originalText = submitBtn.textContent;
+  submitBtn.textContent = 'Listing via Inv API...';
+  submitBtn.disabled = true;
+  
+  const listingData = {
+    name: currentInventoryProduct.name,
+    set: currentInventoryProduct.set || 'Unknown Set',
+    number: currentInventoryProduct.number || '1',
+    price: Math.max(0.99, parseFloat(document.getElementById('ebayPrice').value) || 0),
+    quantity: parseInt(document.getElementById('ebayQuantity').value) || 1,
+    condition: document.getElementById('ebayCondition').value,
+    image: currentInventoryProduct.image || '',
+    game: 'Pokémon'  // Default, can be detected from product data
+  };
+  
+  try {
+    const response = await fetch('/ebay-inventory-list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(listingData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification(`✅ Listed on eBay via Inventory API! ListingID: ${data.listing_id}`);
+      closeEbayModal();
+      
+      // Reset button behavior
+      submitBtn.onclick = submitEbayListing;
+      currentInventoryProduct = null;
+      
+      // Open eBay listing in new tab
+      if (data.listing_url) {
+        window.open(data.listing_url, '_blank');
+      }
+    } else {
+      const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.message;
+      showNotification(`❌ eBay Error: ${errorMsg}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error: ${error.message}`, true);
+  } finally {
+    submitBtn.textContent = originalText;
+    submitBtn.disabled = false;
+    submitBtn.onclick = submitEbayListing;  // Reset to original
+  }
+}
+
+// Settings Functions
+async function openSettingsModal() {
+  try {
+    const response = await fetch('/api/settings');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      const s = data.settings;
+      document.getElementById('settingsTcgUsername').value = s.tcgplayer_username || '';
+      document.getElementById('settingsPostalCode').value = s.postal_code || '';
+      document.getElementById('settingsShippingCost').value = s.default_shipping_cost || 4.99;
+      document.getElementById('settingsShippingService').value = s.default_shipping_service || 'USPSPriority';
+      document.getElementById('settingsHandlingDays').value = s.default_handling_days || 1;
+      document.getElementById('settingsEbayCampaign').value = s.ebay_campaign_id || '';
+      
+      // eBay Business Policies
+      document.getElementById('settingsFulfillmentPolicy').value = s.fulfillment_policy_id || '';
+      document.getElementById('settingsPaymentPolicy').value = s.payment_policy_id || '';
+      document.getElementById('settingsReturnPolicy').value = s.return_policy_id || '';
+    }
+    
+    document.getElementById('settingsModal').classList.add('show');
+  } catch (error) {
+    showNotification('❌ Error loading settings', true);
+  }
+}
+
+function closeSettingsModal() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+async function analyzeEbayRequirements() {
+  const categoryId = document.getElementById('ebayAnalyzeCategory').value.trim();
+  const resultDiv = document.getElementById('ebayAnalyzeResult');
+  
+  if (!categoryId) {
+    resultDiv.innerHTML = '<span style="color:#ff6b6b;">❌ Please enter a category ID</span>';
+    return;
+  }
+  
+  resultDiv.innerHTML = '<span style="color:#8ab4f8;">⏳ Getting requirements via API...</span>';
+  
+  try {
+    const response = await fetch('/ebay-scrape-requirements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category_id: categoryId })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      const req = data.requirements;
+      let html = `<span style="color:#51cf66;">✅ ${data.message}</span><br>`;
+      html += `<div style="background:#1a1a1a; padding:8px; border-radius:4px; margin-top:8px; max-height:300px; overflow:auto;">`;
+      
+      // Show condition info
+      if (req.condition_enabled || req.condition_values.length > 0) {
+        html += `<div style="margin-bottom:12px;"><strong style="color:#8ab4f8;">Condition:</strong> ${req.condition_enabled ? 'Required' : 'Optional'}<br>`;
+        if (req.condition_values.length > 0) {
+          html += `<div style="margin-left:12px; margin-top:4px;">`;
+          req.condition_values.forEach(c => {
+            html += `<div style="color:#aaa;">${c.id}: ${c.name}</div>`;
+          });
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+      
+      // Show other features
+      if (req.features && Object.keys(req.features).length > 0) {
+        html += `<div><strong style="color:#8ab4f8;">Features:</strong><br>`;
+        for (const [name, value] of Object.entries(req.features)) {
+          html += `<div style="margin-left:12px; color:#aaa;">${name}: ${value}</div>`;
+        }
+        html += `</div>`;
+      }
+      
+      html += `</div>`;
+      resultDiv.innerHTML = html;
+      showNotification('✅ Requirements loaded via API!');
+    } else {
+      resultDiv.innerHTML = `<span style="color:#ff6b6b;">❌ ${data.message}</span>`;
+      showNotification(`❌ ${data.message}`, true);
+    }
+  } catch (error) {
+    resultDiv.innerHTML = `<span style="color:#ff6b6b;">❌ Error: ${error.message}</span>`;
+    showNotification(`❌ Error: ${error.message}`, true);
+  }
+}
+
+async function saveSettings() {
+  const settings = {
+    tcgplayer_username: document.getElementById('settingsTcgUsername').value,
+    postal_code: document.getElementById('settingsPostalCode').value,
+    default_shipping_cost: parseFloat(document.getElementById('settingsShippingCost').value) || 4.99,
+    default_shipping_service: document.getElementById('settingsShippingService').value,
+    default_handling_days: parseInt(document.getElementById('settingsHandlingDays').value) || 1,
+    ebay_campaign_id: document.getElementById('settingsEbayCampaign').value,
+    ebay_enabled: true,
+    // eBay Business Policies
+    fulfillment_policy_id: document.getElementById('settingsFulfillmentPolicy').value,
+    payment_policy_id: document.getElementById('settingsPaymentPolicy').value,
+    return_policy_id: document.getElementById('settingsReturnPolicy').value
+  };
+  
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification('✅ Settings saved successfully!');
+      closeSettingsModal();
+    } else {
+      showNotification(`❌ Error: ${data.message}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error saving settings: ${error.message}`, true);
+  }
+}
+
+// ===== PAGE NAVIGATION =====
+function switchPage(pageName) {
+  // Hide all pages
+  document.querySelectorAll('.page-content').forEach(page => {
+    page.classList.remove('active');
+  });
+  
+  // Remove active class from all tabs
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  
+  // Show selected page
+  document.getElementById(pageName + 'Page').classList.add('active');
+  
+  // Activate clicked tab
+  event.target.classList.add('active');
+  
+  // Load data for specific pages
+  if (pageName === 'sold') {
+    loadSoldItems();
+  } else if (pageName === 'settings') {
+    loadSettingsPage();
+  }
+}
+
+// ===== SOLD ITEMS FUNCTIONALITY =====
+let soldItems = JSON.parse(localStorage.getItem('soldItems') || '[]');
+
+function markAsSold(item) {
+  const soldItem = {
+    ...item,
+    soldDate: new Date().toISOString(),
+    soldPrice: item.price,
+    platform: 'TCGPlayer',  // Can be expanded to eBay, etc.
+    id: Date.now() + Math.random()  // Unique ID
+  };
+  
+  soldItems.push(soldItem);
+  localStorage.setItem('soldItems', JSON.stringify(soldItems));
+  
+  // Remove from inventory
+  removeFromInventory(item.name);
+  
+  showNotification('✅ Item marked as sold!');
+  loadSoldItems();
+}
+
+function loadSoldItems() {
+  soldItems = JSON.parse(localStorage.getItem('soldItems') || '[]');
+  renderSoldTable();
+  updateSoldStats();
+}
+
+function renderSoldTable() {
+  const tbody = document.getElementById('soldTable');
+  
+  if (soldItems.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:#888;">No sold items yet. Mark items as sold from the inventory page.</td></tr>';
+    return;
+  }
+  
+  // Apply filters
+  const searchQuery = document.getElementById('soldSearchInput')?.value.toLowerCase() || '';
+  const dateFilter = document.getElementById('soldDateFilter')?.value || 'all';
+  
+  const now = new Date();
+  const filtered = soldItems.filter(item => {
+    // Search filter
+    const matchesSearch = !searchQuery || item.name.toLowerCase().includes(searchQuery);
+    
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const soldDate = new Date(item.soldDate);
+      const diffDays = (now - soldDate) / (1000 * 60 * 60 * 24);
+      
+      if (dateFilter === 'today') matchesDate = diffDays < 1;
+      else if (dateFilter === 'week') matchesDate = diffDays < 7;
+      else if (dateFilter === 'month') matchesDate = diffDays < 30;
+    }
+    
+    return matchesSearch && matchesDate;
+  });
+  
+  // Sort by date (newest first)
+  filtered.sort((a, b) => new Date(b.soldDate) - new Date(a.soldDate));
+  
+  tbody.innerHTML = filtered.map(item => {
+    const qty = item.qty || 1;
+    const costEach = item.cost || 0;
+    const soldPrice = item.soldPrice || item.price || 0;
+    const totalCost = costEach * qty;
+    const totalRevenue = soldPrice * qty;
+    const profit = totalRevenue - totalCost;
+    const profitColor = profit >= 0 ? '#4a8a4a' : '#ff6666';
+    const soldDate = new Date(item.soldDate).toLocaleDateString();
+    const image = item.image || '';
+    
+    return `
+    <tr class="sold-item">
+      <td><strong>${soldDate}</strong></td>
+      <td class="image-cell">
+        ${image ? `<img src="${image}" onerror="this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">` : ''}
+      </td>
+      <td><strong>${item.name}</strong><br><small style="color:#888;">${item.set_name || ''} ${item.card_number || ''}</small></td>
+      <td><strong>${qty}</strong></td>
+      <td style="color:#aaa;">$${costEach.toFixed(2)}</td>
+      <td style="color:#4a8a4a;"><strong>$${soldPrice.toFixed(2)}</strong></td>
+      <td><strong style="color:${profitColor};">$${profit.toFixed(2)}</strong></td>
+      <td>${item.platform || 'TCGPlayer'}</td>
+      <td>
+        <button onclick="undoSold('${item.id}')" style="padding:4px 8px; background:#4a4a1a; border:1px solid #6a6a2a;">↩️ Undo</button>
+        <button onclick="deleteSoldItem('${item.id}')" style="padding:4px 8px; background:#4a1a1a; border:1px solid #6a2a2a;">🗑️</button>
+      </td>
+    </tr>
+    `;
+  }).join('');
+}
+
+function updateSoldStats() {
+  const totalCount = soldItems.length;
+  const totalRevenue = soldItems.reduce((sum, item) => sum + ((item.soldPrice || item.price || 0) * (item.qty || 1)), 0);
+  const totalCost = soldItems.reduce((sum, item) => sum + ((item.cost || 0) * (item.qty || 1)), 0);
+  const totalProfit = totalRevenue - totalCost;
+  
+  document.getElementById('totalSoldCount').textContent = totalCount;
+  document.getElementById('totalRevenue').textContent = `$${totalRevenue.toFixed(2)}`;
+  document.getElementById('totalCost').textContent = `$${totalCost.toFixed(2)}`;
+  document.getElementById('totalProfit').textContent = `$${totalProfit.toFixed(2)}`;
+  document.getElementById('totalProfit').style.color = totalProfit >= 0 ? '#4a8a4a' : '#ff6666';
+}
+
+function filterSoldTable() {
+  renderSoldTable();
+}
+
+function undoSold(itemId) {
+  const item = soldItems.find(i => i.id == itemId);
+  if (!item) return;
+  
+  // Add back to inventory
+  addToInventoryFromSold(item);
+  
+  // Remove from sold items
+  soldItems = soldItems.filter(i => i.id != itemId);
+  localStorage.setItem('soldItems', JSON.stringify(soldItems));
+  
+  showNotification('↩️ Item returned to inventory');
+  loadSoldItems();
+  loadInventory();
+}
+
+function deleteSoldItem(itemId) {
+  if (!confirm('Permanently delete this sold item record?')) return;
+  
+  soldItems = soldItems.filter(i => i.id != itemId);
+  localStorage.setItem('soldItems', JSON.stringify(soldItems));
+  
+  showNotification('🗑️ Sold item deleted');
+  loadSoldItems();
+}
+
+function clearSoldHistory() {
+  if (!confirm('Clear all sold items history? This cannot be undone!')) return;
+  
+  soldItems = [];
+  localStorage.setItem('soldItems', JSON.stringify(soldItems));
+  
+  showNotification('🗑️ Sold history cleared');
+  loadSoldItems();
+}
+
+async function addToInventoryFromSold(item) {
+  try {
+    const response = await fetch('/api/inventory/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: item.name,
+        price: item.price,
+        market: item.market,
+        qty: item.qty || 1,
+        cost: item.cost || 0,
+        tcg_url: item.tcg_url,
+        tcg_product_id: item.tcg_product_id,
+        image: item.image,
+        set_name: item.set_name,
+        card_number: item.card_number
+      })
+    });
+    
+    if (response.ok) {
+      await loadInventory();
+    }
+  } catch (error) {
+    console.error('Error adding back to inventory:', error);
+  }
+}
+
+async function removeFromInventory(itemName) {
+  try {
+    await fetch('/api/inventory/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: itemName })
+    });
+    await loadInventory();
+  } catch (error) {
+    console.error('Error removing from inventory:', error);
+  }
+}
+
+function loadSettingsPage() {
+  // Load settings from server if available
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(data => {
+      if (data.tcgplayer_username) {
+        document.getElementById('settingsTcgUsername').value = data.tcgplayer_username;
+      }
+      if (data.default_markup) {
+        document.getElementById('settingsMarkup').value = data.default_markup;
+      }
+      if (data.email_address) {
+        document.getElementById('settingsEmailAddress').value = data.email_address;
+      }
+      if (data.email_password) {
+        document.getElementById('settingsEmailPassword').value = data.email_password;
+      }
+      if (data.imap_server) {
+        const select = document.getElementById('settingsImapServer');
+        const customInput = document.getElementById('settingsCustomImap');
+        
+        // Check if it's a standard server
+        const found = Array.from(select.options).find(opt => opt.value === data.imap_server);
+        if (found) {
+          select.value = data.imap_server;
+        } else {
+          select.value = 'custom';
+          customInput.value = data.imap_server;
+          document.getElementById('customImapGroup').style.display = 'block';
+        }
+      }
+      if (data.auto_scan) {
+        document.getElementById('settingsAutoScan').value = data.auto_scan;
+      }
+    })
+    .catch(err => console.error('Error loading settings:', err));
+  
+  // Show/hide custom IMAP input
+  document.getElementById('settingsImapServer').addEventListener('change', (e) => {
+    document.getElementById('customImapGroup').style.display = e.target.value === 'custom' ? 'block' : 'none';
+  });
+}
+
+async function saveSettings() {
+  const imapSelect = document.getElementById('settingsImapServer');
+  const imapServer = imapSelect.value === 'custom' 
+    ? document.getElementById('settingsCustomImap').value 
+    : imapSelect.value;
+  
+  // Get password and remove all spaces (Gmail App Passwords have spaces but need to be stored without them)
+  const emailPassword = document.getElementById('settingsEmailPassword').value.replace(/\s+/g, '');
+  
+  const settings = {
+    tcgplayer_username: document.getElementById('settingsTcgUsername').value,
+    default_markup: parseInt(document.getElementById('settingsMarkup').value) || 15,
+    email_address: document.getElementById('settingsEmailAddress').value,
+    email_password: emailPassword,
+    imap_server: imapServer,
+    auto_scan: document.getElementById('settingsAutoScan').value
+  };
+  
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification('✅ Settings saved successfully!');
+    } else {
+      showNotification(`❌ Error: ${data.message}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error saving settings: ${error.message}`, true);
+  }
+}
+
+function togglePasswordVisibility() {
+  const passwordInput = document.getElementById('settingsEmailPassword');
+  const button = event.target;
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    button.textContent = '🙈';
+    button.title = 'Hide password';
+  } else {
+    passwordInput.type = 'password';
+    button.textContent = '👁️';
+    button.title = 'Show password';
+  }
+}
+
+async function testEmailConnection() {
+  // First, save settings
+  await saveSettings();
+  
+  showNotification('🔍 Testing email connection...');
+  
+  try {
+    const response = await fetch('/api/email/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unread_only: false, max_emails: 50 })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification('✅ Email connection successful!');
+    } else {
+      let errorMsg = data.message;
+      
+      // Add helpful hints for common errors
+      if (errorMsg.includes('authentication') || errorMsg.includes('password') || errorMsg.includes('credentials')) {
+        errorMsg += '\n\n💡 Gmail users: Make sure you\'re using an App Password, not your regular Gmail password!\n📧 Go to myaccount.google.com/apppasswords';
+      } else if (errorMsg.includes('connection') || errorMsg.includes('timeout')) {
+        errorMsg += '\n\n💡 Check your internet connection and IMAP server address';
+      }
+      
+      showNotification(`❌ Connection failed: ${errorMsg}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error: ${error.message}`, true);
+  }
+}
+
+// ===== EMAIL SCANNING & PENDING SALES =====
+let pendingSales = [];
+
+async function scanEmails() {
+  showNotification('📧 Scanning emails for new sales...');
+  
+  try {
+    const response = await fetch('/api/email/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unread_only: true, max_emails: 50 })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      if (data.sales_found > 0) {
+        showNotification(`✅ Found ${data.sales_found} new sales!`);
+        loadPendingSales();
+      } else {
+        showNotification('ℹ️ No new sales found');
+      }
+    } else {
+      showNotification(`❌ Error: ${data.message}`, true);
+    }
+  } catch (error) {
+    showNotification(`❌ Error scanning emails: ${error.message}`, true);
+  }
+}
+
+async function loadPendingSales() {
+  try {
+    const response = await fetch('/api/pending-sales');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      pendingSales = data.pending_sales;
+      renderPendingSalesBanner();
+    }
+  } catch (error) {
+    console.error('Error loading pending sales:', error);
+  }
+}
+
+function renderPendingSalesBanner() {
+  const banner = document.getElementById('pendingSalesBanner');
+  const list = document.getElementById('pendingSalesList');
+  const countBadge = document.getElementById('pendingSalesCount');
+  
+  // Count total products across all sales
+  let totalProducts = 0;
+  pendingSales.forEach(sale => {
+    totalProducts += sale.products.length;
+  });
+  
+  if (totalProducts === 0) {
+    banner.style.display = 'none';
+    return;
+  }
+  
+  countBadge.textContent = totalProducts;
+  banner.style.display = 'block';
+  
+  // Render each pending sale - group by order
+  list.innerHTML = pendingSales.map(sale => {
+    const saleId = sale.email_id || sale.timestamp;
+    const dateStr = new Date(sale.date || sale.timestamp).toLocaleDateString();
+    const orderId = sale.order_id || 'Unknown';
+    const orderTotal = sale.order_total || 0;
+    
+    // Create order header
+    const orderHeader = `
+      <div style="background:#1a2332; padding:10px; margin:10px 0; border-radius:4px; border-left:4px solid #8ab4f8;">
+        <strong style="color:#8ab4f8;">Order: ${orderId}</strong>
+        <span style="float:right; color:#4ade80; font-weight:bold;">Total: $${orderTotal.toFixed(2)}</span>
+        <br>
+        <small style="color:#888;">${dateStr} • ${sale.products.length} item(s)</small>
+      </div>
+    `;
+    
+    // Create product rows for this order
+    const productRows = sale.products.map(product => {
+      return `
+        <div class="pending-sale-item" data-sale-id="${saleId}" data-product="${product.name}" style="margin-left:15px; border-left:2px solid #333;">
+          <div class="pending-sale-info">
+            <strong>💰 ${product.name}</strong>
+            <small>Qty: ${product.quantity} • Est. Price: $${product.price.toFixed(2)} • ${product.condition || 'Unknown'}</small>
+          </div>
+          <div class="pending-sale-actions">
+            <button class="confirm-btn" onclick='confirmPendingSale("${saleId}", "${product.name.replace(/'/g, "\\'")}","${product.quantity}","${product.price}","${product.order_id || orderId}","${product.condition || 'Unknown'}","${product.order_date || dateStr}","${orderTotal}")'>
+              ✅ Confirm & Mark Sold
+            </button>
+            <button class="dismiss-btn" onclick='dismissPendingSale("${saleId}", "${product.name.replace(/'/g, "\\'")}",)'>
+              ✖ Dismiss
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    return orderHeader + productRows;
+  }).join('');
+}
+
+let currentSaleToConfirm = null;
+
+async function confirmPendingSale(saleId, productName, quantity, price, orderId, condition, orderDate, orderTotal) {
+  try {
+    // Store sale info for finalization
+    currentSaleToConfirm = { saleId, productName, quantity, price, orderId, condition, orderDate, orderTotal };
+    
+    // Find matching item in inventory
+    const matchingItem = inventoryData.find(item => 
+      item.name.toLowerCase().includes(productName.toLowerCase()) ||
+      productName.toLowerCase().includes(item.name.toLowerCase())
+    );
+    
+    // Populate confirmation modal with detailed info
+    document.getElementById('saleConfirmDetails').innerHTML = `
+      <div style="background:#1a2332; padding:15px; border-radius:4px; margin-bottom:10px;">
+        <strong style="color:#8ab4f8; font-size:16px;">${productName}</strong><br>
+        <div style="margin-top:8px; color:#888; font-size:13px;">
+          <div>Condition: <span style="color:#bbb;">${condition}</span></div>
+          <div>Order ID: <span style="color:#bbb;">${orderId}</span></div>
+          <div>Order Date: <span style="color:#bbb;">${orderDate || 'N/A'}</span></div>
+          <div>Order Total: <span style="color:#4ade80;">$${parseFloat(orderTotal || price).toFixed(2)}</span></div>
+          <div style="margin-top:5px; border-top:1px solid #333; padding-top:5px;">
+            Matched inventory: <span style="color:${matchingItem ? '#4ade80' : '#f87171'};">${matchingItem ? matchingItem.name : 'Not found in inventory'}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Set initial sold price to auto-calculated value, but allow editing
+    document.getElementById('confirmSoldPrice').value = parseFloat(price) || 0;
+    document.getElementById('confirmQuantity').value = parseInt(quantity) || 1;
+    document.getElementById('confirmCost').value = matchingItem ? (matchingItem.cost || 0) : 0;
+    
+    // Calculate initial profit
+    updateProfitDisplay();
+    
+    // Show modal
+    document.getElementById('saleConfirmModal').style.display = 'flex';
+  } catch (error) {
+    console.error('Error preparing sale confirmation:', error);
+    showNotification('❌ Error preparing confirmation', true);
+  }
+}
+
+function updateProfitDisplay() {
+  const cost = parseFloat(document.getElementById('confirmCost').value) || 0;
+  const soldPrice = parseFloat(document.getElementById('confirmSoldPrice').value) || 0;
+  const quantity = parseInt(document.getElementById('confirmQuantity').value) || 1;
+  
+  const profit = (soldPrice - cost) * quantity;
+  const profitSpan = document.getElementById('profitAmount');
+  profitSpan.textContent = `$${profit.toFixed(2)}`;
+  profitSpan.style.color = profit >= 0 ? '#4ade80' : '#f87171';
+}
+
+function closeSaleConfirmModal() {
+  document.getElementById('saleConfirmModal').style.display = 'none';
+  currentSaleToConfirm = null;
+}
+
+async function finalizeConfirmSale() {
+  if (!currentSaleToConfirm) return;
+  
+  const { saleId, productName, quantity, price, orderId } = currentSaleToConfirm;
+  const cost = parseFloat(document.getElementById('confirmCost').value) || 0;
+  
+  try {
+    // Find matching item in inventory
+    const matchingItem = inventoryData.find(item => 
+      item.name.toLowerCase().includes(productName.toLowerCase()) ||
+      productName.toLowerCase().includes(item.name.toLowerCase())
+    );
+    
+    if (!matchingItem) {
+      if (!confirm(`Could not find "${productName}" in inventory. Mark as sold anyway?`)) {
+        return;
+      }
+    }
+    
+    // Confirm with server (pass order_id for caching)
+    const response = await fetch('/api/pending-sales/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sale_id: saleId,
+        product_name: productName,
+        confirmed: true,
+        order_id: orderId  // Pass order_id so server can cache it
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      // Get the user-entered sold price from the modal
+      const finalSoldPrice = parseFloat(document.getElementById('confirmSoldPrice').value) || 0;
+      const finalQuantity = parseInt(document.getElementById('confirmQuantity').value) || 1;
+      
+      // Create sold item entry (even if not in inventory)
+      const soldItem = {
+        name: productName,
+        soldDate: new Date().toISOString(),
+        soldPrice: finalSoldPrice,
+        cost: cost,
+        qty: finalQuantity,
+        platform: 'TCGPlayer (Email)',
+        condition: condition || 'Unknown',
+        orderId: orderId,
+        id: Date.now() + Math.random()
+      };
+      
+      // If found in inventory, copy additional data
+      if (matchingItem) {
+        soldItem.image = matchingItem.image;
+        soldItem.set = matchingItem.set;
+        soldItem.number = matchingItem.number;
+        
+        // Remove from inventory
+        await removeFromInventory(matchingItem.name);
+      }
+      
+      soldItems.push(soldItem);
+      localStorage.setItem('soldItems', JSON.stringify(soldItems));
+      
+      const profit = ((finalSoldPrice - cost) * finalQuantity).toFixed(2);
+      showNotification(`✅ ${productName} marked as sold! Profit: $${profit}`);
+      
+      // Close modal
+      closeSaleConfirmModal();
+      
+      // Reload pending sales
+      loadPendingSales();
+      loadInventory();
+    }
+  } catch (error) {
+    showNotification(`❌ Error: ${error.message}`, true);
+  }
+}
+
+async function dismissPendingSale(saleId, productName) {
+  try {
+    const response = await fetch('/api/pending-sales/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sale_id: saleId,
+        product_name: productName,
+        confirmed: false
+      })
+    });
+    
+    if (response.ok) {
+      showNotification('Sale dismissed');
+      loadPendingSales();
+    }
+  } catch (error) {
+    console.error('Error dismissing sale:', error);
+  }
+}
+
+async function dismissAllPendingSales() {
+  if (!confirm('Dismiss all pending sales?')) return;
+  
+  try {
+    const response = await fetch('/api/pending-sales/dismiss-all', {
+      method: 'POST'
+    });
+    
+    if (response.ok) {
+      showNotification('All pending sales dismissed');
+      loadPendingSales();
+    }
+  } catch (error) {
+    console.error('Error dismissing all:', error);
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  // Fix pending products structure
+  let pending = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+  pending = pending.map(p => ({ ...p, quantity: p.quantity || 1 }));
+  localStorage.setItem('pendingProducts', JSON.stringify(pending));
+  
+  renderPendingList();
+  loadInventory();
+  initAutocomplete();
+  loadSoldItems();
+  loadPendingSales();
+  loadSettingsPage(); // Load settings on startup so they're ready when user opens Settings tab
+  
+  const input = document.getElementById('productSearchInput');
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') searchProducts();
+  });
+  
+  // Auto-scan on startup if enabled
+  fetch('/api/settings')
+    .then(res => res.json())
+    .then(settings => {
+      if (settings.auto_scan === 'startup') {
+        setTimeout(() => scanEmails(), 2000);
+      } else if (settings.auto_scan === 'interval') {
+        // Scan every 5 minutes
+        setInterval(() => scanEmails(), 5 * 60 * 1000);
+      }
+    })
+    .catch(err => console.error('Error loading auto-scan setting:', err));
+});
+</script>
+</body>
+</html>

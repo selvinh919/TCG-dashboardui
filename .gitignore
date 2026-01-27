@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Sensitive Configuration Files
+settings.json
+config.py
+ebay_config.py
+
+# User Data Files
+state.json
+confirmed_sales.json
+pending_sales.json
+image_cache.json
+recently_added.json
+
+# Playwright Browser Profile (may contain session data)
+tcg_playwright_profile/
+ebay_playwright_profile/
+
+# Backup Files
+*_backup.py
+*_old.html
+server_backup.py
+inventory_dashboard_old.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

@@ -17,6 +17,10 @@ app = Flask(__name__)
 last_sync_time = 0
 SYNC_COOLDOWN = 60  # 60 seconds between syncs
 
+# Search cache (TTL: 5 minutes)
+search_cache = {}
+SEARCH_CACHE_TTL = 300
+
 @app.route('/')
 def dashboard():
     """Serve the dashboard HTML"""
@@ -116,6 +120,11 @@ def get_inventory():
             'totals': {'ask': 0, 'market': 0, 'delta': 0}
         }), 500
 
+@app.route('/api/autocomplete')
+def autocomplete():
+    """Autocomplete endpoint - uses same logic as search"""
+    return search_products()
+
 @app.route('/search-products', methods=['GET'])
 def search_products():
     """Search for TCGPlayer products with smart query fallbacks"""
@@ -124,6 +133,17 @@ def search_products():
     
     if not query:
         return jsonify({'status': 'error', 'message': 'Search query required'}), 400
+    
+    # Check cache first
+    cache_key = f"{game}:{query.lower()}"
+    current_time = time.time()
+    
+    if cache_key in search_cache:
+        cached_data, timestamp = search_cache[cache_key]
+        if current_time - timestamp < SEARCH_CACHE_TTL:
+            print(f"[SEARCH] Returning cached results for '{query}'")
+            cached_data['cached'] = True
+            return jsonify(cached_data)
     
     try:
         from playwright.sync_api import sync_playwright
@@ -136,7 +156,6 @@ def search_products():
         query_lower = query.lower()
         if '/' in query or any(c.isdigit() for c in query):
             # Extract likely card name (text before numbers/set codes)
-            import re
             card_name = re.sub(r'\s*[#\-]*\s*[a-z]*\d+[/\-]?[a-z]*\d*\s*$', '', query, flags=re.IGNORECASE).strip()
             if card_name and card_name != query:
                 search_queries.append(card_name)
@@ -151,6 +170,7 @@ def search_products():
         
         results = []
         
+        # Create browser for this search (optimized for speed)
         with sync_playwright() as p:
             profile_path = os.path.join(os.path.dirname(__file__), 'tcg_playwright_profile')
             
@@ -160,11 +180,19 @@ def search_products():
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--disable-features=IsolateOrigins,site-per-process',
-                    '--disable-site-isolation-trials'
+                    '--disable-site-isolation-trials',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--disable-extensions',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
                 ],
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                viewport={'width': 1920, 'height': 1080},
-                java_script_enabled=True
+                viewport={'width': 1280, 'height': 720},
+                java_script_enabled=True,
+                ignore_https_errors=True
             )
             
             page = browser.pages[0] if browser.pages else browser.new_page()
@@ -174,29 +202,23 @@ def search_products():
                 search_url = f"https://www.tcgplayer.com/search/{game}/product?productLineName={game}&q={requests.utils.quote(search_query)}&view=grid"
                 
                 print(f"[SEARCH] Attempt {attempt + 1}: {search_url}")
-                page.goto(search_url, wait_until='domcontentloaded', timeout=20000)
+                # Use 'commit' for fastest loading - don't wait for all resources
+                page.goto(search_url, wait_until='commit', timeout=10000)
                 
-                # Wait for results
+                # Wait only for product links to appear
                 try:
-                    page.wait_for_selector('article, .product-card, .search-result, [class*="product"]', timeout=5000)
-                    print(f"[SEARCH] Products loaded")
+                    page.wait_for_selector('a[href*="/product/"]', timeout=2000)
                 except:
-                    print(f"[SEARCH] Timeout waiting for products")
+                    # If no products found quickly, wait a bit more
+                    page.wait_for_timeout(500)
                 
-                page.wait_for_timeout(1500)
-                
-                # Get page HTML and check for results
-                html_content = page.content()
-                print(f"[SEARCH] Page HTML length: {len(html_content)}")
-                
-                # Try multiple selector strategies
-                product_links = []
+                # Get all product links in one go
                 all_links = page.query_selector_all('a[href*="/product/"]')
                 print(f"[SEARCH] Found {len(all_links)} product links")
                 
                 seen_ids = set()
                 
-                for link in all_links[:30]:  # Check up to 30 links
+                for link in all_links[:30]:  # Check up to 30 links for more results
                     try:
                         href = link.get_attribute('href')
                         if not href:
@@ -214,113 +236,96 @@ def search_products():
                             continue
                         seen_ids.add(product_id)
                         
-                        # Get product name - try multiple methods
+                        # Get product name - optimized single pass
                         name = ''
                         
-                        # Method 1: Get text from the link
                         try:
+                            # Try getting text content first (fastest)
                             text = link.inner_text().strip()
                             if text and 3 < len(text) < 200 and not text.lower().startswith('view'):
                                 name = text
-                                print(f"[SEARCH] Product {product_id}: {name}")
-                        except:
-                            pass
-                        
-                        # Method 2: Try alt text from image
-                        if not name:
-                            try:
+                            else:
+                                # Fallback: try img alt or aria-label
                                 img = link.query_selector('img')
                                 if img:
                                     alt = img.get_attribute('alt')
                                     if alt and len(alt) > 3:
                                         name = alt
-                                        print(f"[SEARCH] Product {product_id} (from img alt): {name}")
-                            except:
-                                pass
-                        
-                        # Method 3: Get aria-label
-                        if not name:
-                            try:
-                                aria_label = link.get_attribute('aria-label')
-                                if aria_label and len(aria_label) > 3:
-                                    name = aria_label
-                                    print(f"[SEARCH] Product {product_id} (from aria): {name}")
-                            except:
-                                pass
+                                if not name:
+                                    aria_label = link.get_attribute('aria-label')
+                                    if aria_label and len(aria_label) > 3:
+                                        name = aria_label
+                        except:
+                            pass
                         
                         if not name:
-                            print(f"[SEARCH] Skipping product {product_id} - no name found")
                             continue
                         
-                        # Clean up name
+                        # Quick cleanup - minimal processing for speed
                         name = ' '.join(name.split())
                         
-                        # Initialize prices
+                        # Fast price extraction - get both market and lowest prices
                         lowest_price = 0
                         market_price = 0
                         
                         # Extract lowest price from "XXX listings from $X.XX" pattern
-                        lowest_match = re.search(r'(\d+)\s+listings\s+from\s+\$([\d.]+)', name)
+                        lowest_match = re.search(r'listings\s+from\s+\$(\d+\.\d{2})', name)
                         if lowest_match:
-                            lowest_price = float(lowest_match.group(2))
-                            print(f"[SEARCH] Found lowest price in text: ${lowest_price}")
+                            lowest_price = float(lowest_match.group(1))
                         
-                        # Extract market price from "Market Price:$X.XX" pattern
-                        market_match = re.search(r'Market\s+Price:\s*\$([\d.]+)', name)
+                        # Extract market price from "Market Price: $X.XX" pattern
+                        market_match = re.search(r'Market\s+Price:\s*\$(\d+\.\d{2})', name)
                         if market_match:
                             market_price = float(market_match.group(1))
-                            print(f"[SEARCH] Found market price in text: ${market_price}")
                         
-                        # Clean the product name - remove extra data
-                        # Pattern: "SET, #NUMBER NAME - NUMBER XXX listings from $X.XX Market Price:$X.XX"
-                        cleaned_name = name
+                        # Quick name cleaning - remove price text
+                        display_name = re.sub(r'\d+\s+listings.*', '', name)
+                        display_name = re.sub(r'Market\s+Price.*', '', display_name)
+                        display_name = display_name.strip()
                         
-                        # Remove "XXX listings from $X.XX" pattern
-                        cleaned_name = re.sub(r'\d+\s+listings\s+from\s+\$[\d.]+', '', cleaned_name)
+                        # Clean up redundant information and formatting
+                        # Remove product type prefixes like "Miscellaneous Cards & Products Rare, "
+                        display_name = re.sub(r'^[^#]+?,\s*', '', display_name)
                         
-                        # Remove "Market Price:$X.XX" pattern
-                        cleaned_name = re.sub(r'Market\s+Price:\s*\$[\d.]+', '', cleaned_name)
-                        
-                        # Try to extract card number if present
+                        # Extract the main card number pattern (e.g., #059/131 or #059)
                         card_number = ''
-                        number_match = re.search(r'#(\d+[^\s]*)', cleaned_name)
+                        number_match = re.search(r'#([\d/]+)', display_name)
                         if number_match:
                             card_number = number_match.group(1)
+                            # Remove duplicate card numbers at the end if they match
+                            # e.g., "Umbreon - 059 (Cosmos Holo) #059/131" -> keep only one
+                            if card_number:
+                                # Remove trailing duplicate: "#059/131" at the end
+                                display_name = re.sub(r'\s*#?' + re.escape(card_number) + r'\s*$', '', display_name)
+                                # Remove leading duplicate: "#059/131 " at the start
+                                display_name = re.sub(r'^#?' + re.escape(card_number) + r'\s+', '', display_name)
                         
-                        # Remove duplicate card numbers (e.g., "#173 Eevee - 173")
-                        cleaned_name = re.sub(r'\s*-\s*\d+\s*$', '', cleaned_name)
+                        # Final cleanup - remove extra spaces and trailing dashes
+                        display_name = re.sub(r'\s+', ' ', display_name).strip()
+                        display_name = display_name.strip(' ,-')
                         
-                        # Clean up extra commas, spaces, and dashes
-                        cleaned_name = re.sub(r'\s*,\s*#', ' #', cleaned_name)
-                        cleaned_name = re.sub(r'\s+', ' ', cleaned_name).strip()
-                        
-                        # Try to extract set name (everything before first comma or "Promo, #")
-                        set_name = game.title()
-                        set_match = re.match(r'^([^,#]+?)(?:,|\s+Promo|\s+#)', cleaned_name)
-                        if set_match:
-                            set_name = set_match.group(1).strip()
-                        
-                        # Get just the card name (after # or after set name)
-                        card_name_only = cleaned_name
-                        if '#' in cleaned_name:
-                            parts = cleaned_name.split('#', 1)
-                            if len(parts) > 1:
-                                # Get everything after the #NUMBER part
-                                after_number = parts[1]
-                                # Remove the number itself
-                                card_name_only = re.sub(r'^[\d/]+\s*', '', after_number).strip()
-                        
-                        # Final cleanup
-                        card_name_only = card_name_only.strip(' ,-')
-                        
-                        print(f"[SEARCH] Cleaned: {card_name_only} (#{card_number}) Market:${market_price} Lowest:${lowest_price}")
-                        
-                        # Get image URL
+                        # Improved image URL extraction - check multiple sources
                         image_url = ''
                         try:
                             img = link.query_selector('img')
                             if img:
-                                src = img.get_attribute('src')
+                                # Try multiple image source attributes (for lazy loading)
+                                src = (img.get_attribute('src') or 
+                                       img.get_attribute('data-src') or 
+                                       img.get_attribute('data-lazy-src') or 
+                                       img.get_attribute('data-image') or
+                                       '')
+                                
+                                # Also check srcset if src is empty or placeholder
+                                if not src or 'placeholder' in src.lower() or 'data:' in src:
+                                    srcset = img.get_attribute('srcset') or ''
+                                    if srcset:
+                                        # Extract first URL from srcset
+                                        first_url = srcset.split(',')[0].strip().split(' ')[0]
+                                        if first_url:
+                                            src = first_url
+                                
+                                # Validate and clean image URL
                                 if src:
                                     if src.startswith('//'):
                                         image_url = 'https:' + src
@@ -328,42 +333,30 @@ def search_products():
                                         image_url = 'https://www.tcgplayer.com' + src
                                     elif src.startswith('http'):
                                         image_url = src
+                                    
+                                    # Skip invalid images: data URIs, svgs, placeholders, "coming soon" images
+                                    skip_patterns = ['data:', '.svg', 'placeholder', 'coming-soon', 'comingsoon', 'no-image', 'noimage']
+                                    if any(pattern in image_url.lower() for pattern in skip_patterns):
+                                        image_url = ''
                         except:
                             pass
                         
-                        # Try to find market price from parent element if not already found
-                        if market_price == 0:
-                            try:
-                                # Look for parent article/card container
-                                parent = link.evaluate_handle('el => el.closest("article, [class*=\"product\"], [class*=\"card\"]")')
-                                if parent:
-                                    # Get all text from parent
-                                    parent_text = parent.as_element().inner_text()
-                                    # Look for price patterns like $1.23 or Market Price: $1.23
-                                    price_matches = re.findall(r'\$([0-9]+\.[0-9]{2})', parent_text)
-                                    if price_matches:
-                                        # Usually the first or second price is the market price
-                                        market_price = float(price_matches[0])
-                                        print(f"[SEARCH] Found price ${market_price} for {name[:30]}")
-                            except Exception as e:
-                                pass
-                        
                         results.append({
                             'productId': product_id,
-                            'name': card_name_only[:150] if card_name_only else cleaned_name[:150],
-                            'fullName': cleaned_name[:150],
-                            'set': set_name,
+                            'name': display_name[:150],
+                            'fullName': display_name[:150],
+                            'set': game.title(),
                             'number': card_number,
                             'imageUrl': image_url,
                             'marketPrice': market_price,
                             'lowestPrice': lowest_price
                         })
                         
-                        if len(results) >= 8:
+                        # Collect more results for better selection
+                        if len(results) >= 15:
                             break
                     
                     except Exception as e:
-                        print(f"[SEARCH] Error parsing link: {e}")
                         continue
                 
                 # If we found results, stop trying other queries
@@ -383,20 +376,49 @@ def search_products():
                     # Filter results that match the set code
                     filtered = [r for r in results if set_code in r.get('number', '').lower() or set_code in r.get('fullName', '').lower()]
                     if filtered:
-                        print(f"[SEARCH] Filtered from {len(results)} to {len(filtered)} results")
                         results = filtered
             
             browser.close()
         
-        print(f"[SEARCH] Returning {len(results)} products")
+        print(f"[SEARCH] Returning {len(results)} products for '{query}'")
         
-        return jsonify({'status': 'success', 'results': results})
+        # Cache the results
+        response_data = {'status': 'success', 'results': results, 'cached': False}
+        search_cache[cache_key] = (response_data, current_time)
+        
+        # Clean old cache entries (keep cache size manageable)
+        if len(search_cache) > 100:
+            oldest_keys = sorted(search_cache.keys(), key=lambda k: search_cache[k][1])[:20]
+            for key in oldest_keys:
+                del search_cache[key]
+        
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"[ERROR] Search failed: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/pending-sales')
+def get_pending_sales():
+    """Return pending sales data"""
+    try:
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'status': 'success', 'sales': data})
+    except FileNotFoundError:
+        return jsonify({'status': 'success', 'sales': []})
+
+@app.route('/api/settings')
+def get_settings():
+    """Return settings data"""
+    try:
+        with open('settings.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'status': 'success', 'settings': data})
+    except FileNotFoundError:
+        return jsonify({'status': 'success', 'settings': {}})
 
 @app.route('/mark-added', methods=['POST'])
 def mark_added():

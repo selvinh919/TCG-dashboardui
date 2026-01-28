@@ -11,8 +11,8 @@ table { width:100%; border-collapse:collapse; margin-top:20px; }
 td, th { padding:8px; border-bottom:1px solid #333; }
 th { background:#1a1a1a; text-align:left; }
 img { width:48px; cursor:pointer; }
-.image-cell { position:relative; }
-.image-preview { display:none; position:absolute; left:100%; top:50%; transform:translateY(-50%); z-index:9999; height:200px; width:auto; margin-left:20px; box-shadow:0 0 20px rgba(0,0,0,0.9); border:2px solid #444; border-radius:8px; }
+.image-cell { position:relative; z-index:1; }
+.image-preview { display:none; position:fixed; z-index:99999; height:200px; width:auto; pointer-events:none; box-shadow:0 0 20px rgba(0,0,0,0.9); border:2px solid #444; border-radius:8px; background:#000; }
 .image-cell:hover .image-preview { display:block; }
 .good { background:#0d2a17; }
 .danger { background:#3a0d0d; }
@@ -52,8 +52,8 @@ button:disabled { background:#333; color:#666; cursor:not-allowed; }
 .remove-btn:hover { background:#5a2a2a; }
 .add-product-section { background:#1a1a1a; padding:20px; border-radius:8px; margin-bottom:20px; }
 .add-product-section h3 { margin-top:0; color:#8ab4f8; }
-.search-results { margin-top:15px; max-height:400px; overflow-y:auto; }
-.product-result { display:flex; gap:12px; padding:10px; background:#0f0f0f; border:1px solid #333; border-radius:6px; margin-bottom:8px; align-items:center; transition:all 0.2s; }
+.search-results { margin-top:15px; max-height:400px; overflow-y:auto; overflow-x:visible; position:relative; }
+.product-result { display:flex; gap:12px; padding:10px; background:#0f0f0f; border:1px solid #333; border-radius:6px; margin-bottom:8px; align-items:center; transition:all 0.2s; position:relative; }
 .product-result:hover { border-color:#555; background:#1a1a1a; }
 .product-result .image-cell { position:relative; }
 .product-result .image-cell img:first-child { width:48px; cursor:pointer; }
@@ -525,7 +525,7 @@ function initAutocomplete() {
       return;
     }
     
-    // Debounce: wait 1000ms (increased from 300ms to reduce server load)
+    // Debounce: wait 300ms for fast response (server has caching)
     autocompleteTimeout = setTimeout(() => {
       showAutocompleteSuggestions(query);
     }, 1000);
@@ -676,9 +676,9 @@ function renderInventory() {
       <td class="image-cell">
         ${image ? `
           <a href="${tcgEditUrl}" target="_blank">
-            <img src="${image}" onerror="this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">
+            <img src="${image}" onerror="this.onerror=null;this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">
           </a>
-          <img class="image-preview" src="${image}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+          <img class="image-preview" src="${image}" onerror="this.onerror=null;this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
         ` : '<img src="https://via.placeholder.com/48x67?text=NO+IMAGE">'}
       </td>
       <td>
@@ -821,8 +821,8 @@ async function searchProducts() {
              data-lowest-price="${product.lowestPrice || 0}"
              data-card-number="${product.number || ''}">
           <div class="image-cell">
-            <img src="${product.imageUrl || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
-            <img class="image-preview" src="${product.imageUrl || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+            <img src="${product.imageUrl || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.onerror=null;this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
+            <img class="image-preview" src="${product.imageUrl || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.onerror=null;this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
           </div>
           <div class="product-result-info">
             <strong>${product.name}${product.number ? ' #' + product.number : ''}</strong>
@@ -841,7 +841,7 @@ async function searchProducts() {
         </div>
       `).join('');
       
-      // Add event listeners
+      // Add event listeners for buttons
       document.querySelectorAll('.add-to-pending-btn').forEach(btn => {
         btn.addEventListener('click', function() {
           const productDiv = this.closest('.product-result');
@@ -855,6 +855,21 @@ async function searchProducts() {
             productDiv.dataset.cardNumber
           );
         });
+      });
+      
+      // Add event listeners for image preview positioning
+      document.querySelectorAll('.image-cell').forEach(cell => {
+        const thumbnail = cell.querySelector('img:first-child');
+        const preview = cell.querySelector('.image-preview');
+        
+        if (thumbnail && preview) {
+          thumbnail.addEventListener('mouseenter', function(e) {
+            const rect = thumbnail.getBoundingClientRect();
+            // Position preview to the right of thumbnail with some margin
+            preview.style.left = (rect.right + 20) + 'px';
+            preview.style.top = (rect.top + rect.height / 2 - 100) + 'px'; // Center vertically
+          });
+        }
       });
     } else {
       resultsDiv.innerHTML = '<p style="color:#888;">No results found. Try a different search term.</p>';
@@ -1014,8 +1029,8 @@ function renderPendingList() {
     return `
     <div class="pending-product">
       <div class="image-cell">
-        <img src="${product.image || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
-        <img class="image-preview" src="${product.image || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
+        <img src="${product.image || 'https://via.placeholder.com/50x70?text=NO+IMAGE'}" onerror="this.onerror=null;this.src='https://via.placeholder.com/50x70?text=NO+IMAGE'">
+        <img class="image-preview" src="${product.image || 'https://via.placeholder.com/200x280?text=NO+IMAGE'}" onerror="this.onerror=null;this.src='https://via.placeholder.com/200x280?text=NO+IMAGE'">
       </div>
       <div class="pending-product-info">
         <strong>${product.name}${product.cardNumber ? ' #' + product.cardNumber : ''}</strong>
@@ -1492,7 +1507,7 @@ function renderSoldTable() {
     <tr class="sold-item">
       <td><strong>${soldDate}</strong></td>
       <td class="image-cell">
-        ${image ? `<img src="${image}" onerror="this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">` : ''}
+        ${image ? `<img src="${image}" onerror="this.onerror=null;this.src='https://via.placeholder.com/48x67?text=NO+IMAGE'">` : ''}
       </td>
       <td><strong>${item.name}</strong><br><small style="color:#888;">${item.set_name || ''} ${item.card_number || ''}</small></td>
       <td><strong>${qty}</strong></td>

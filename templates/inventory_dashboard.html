@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCG Inventory</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow-x: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #2d3748; min-height: 100vh; }
+
+/* Top Navigation */
+.top-nav { position: fixed; top: 0; left: 220px; right: 0; height: 70px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 30px; z-index: 100; }
+.top-nav .search-box { flex: 1; max-width: 500px; margin: 0 auto; position: relative; }
+.top-nav .search-box input { width: 100%; padding: 10px 40px 10px 15px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: #f7fafc; }
+.top-nav .search-box i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #a0aec0; }
+.top-nav .nav-icons { display: flex; gap: 15px; align-items: center; }
+.top-nav .nav-icon { width: 40px; height: 40px; border-radius: 50%; background: #f7fafc; display: flex; align-items: center; justify-content: center; color: #718096; cursor: pointer; transition: all 0.3s; }
+.top-nav .nav-icon:hover { background: #e2e8f0; }
+.top-nav .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: #4299e1; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; cursor: pointer; }
+
+/* Left Sidebar */
+.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #2d3748; color: white; padding: 20px 0; z-index: 101; display: flex; flex-direction: column; }
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 20px 30px; font-size: 18px; font-weight: 700; }
+.sidebar-logo i { font-size: 24px; }
+.sidebar-menu { list-style: none; flex: 1; }
+.sidebar-menu li { margin-bottom: 2px; }
+.sidebar-menu a { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.3s; cursor: pointer; font-size: 14px; }
+.sidebar-menu a:hover, .sidebar-menu a.active { background: rgba(255,255,255,0.1); color: white; }
+.sidebar-menu a i { width: 20px; }
+.sidebar-logout { padding: 0 20px; margin-top: auto; }
+.sidebar-logout a { display: flex; align-items: center; gap: 12px; padding: 12px 0; color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.3s; }
+.sidebar-logout a:hover { color: white; }
+.sidebar-logout a i { width: 20px; }
+
+/* Main Content */
+.main-content { margin-left: 220px; margin-top: 70px; padding: 30px; display: grid; grid-template-columns: 1fr 400px; gap: 30px; min-height: calc(100vh - 70px); max-width: 100%; box-sizing: border-box; }
+.main-section { display: flex; flex-direction: column; gap: 25px; min-width: 0; overflow-x: auto; }
+
+@media (max-width: 1400px) {
+  .main-content { grid-template-columns: 1fr; }
+  .right-sidebar { max-width: 100%; }
+}
+
+@media (max-width: 768px) {
+  .sidebar { width: 60px; }
+  .sidebar-logo span, .sidebar-menu a span { display: none; }
+  .main-content { margin-left: 60px; padding: 15px; }
+  .top-nav { left: 60px; }
+}
+
+/* Stat Cards */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.stat-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; color: #718096; font-size: 13px; font-weight: 500; }
+.stat-card-header i { font-size: 20px; }
+.stat-card-value { font-size: 28px; font-weight: 700; color: #2d3748; margin-bottom: 8px; }
+.stat-card-subtitle { font-size: 12px; color: #a0aec0; }
+.stat-card-subtitle i { color: #f6ad55; margin-right: 4px; }
+
+/* Content Card */
+.content-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.content-card h3 { font-size: 18px; font-weight: 600; color: #2d3748; margin-bottom: 20px; }
+
+/* Inventory Controls */
+.inventory-controls { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+.inventory-controls .ask-label { font-size: 14px; font-weight: 600; color: #2d3748; }
+.inventory-controls select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: white; }
+.inventory-controls .sync-btn { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* Inventory Search Bar */
+.inventory-search-bar { display: flex; align-items: center; gap: 15px; }
+.inventory-search-bar input:focus { outline: none; border-color: #4299e1; }
+
+/* Table */
+.inventory-table-wrapper { overflow-x: auto; }
+.inventory-table { width: 100%; border-collapse: collapse; }
+.inventory-table tbody { transition: opacity 0.2s ease-in-out; }
+.inventory-table thead th { text-align: left; padding: 12px; font-size: 11px; font-weight: 600; color: #a0aec0; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; background: white; }
+.inventory-table thead th:hover { background: #f7fafc; }
+.inventory-table tbody td { padding: 15px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.inventory-table tbody tr:hover { background: #f7fafc; }
+.inventory-table .card-image { width: 60px; height: auto; border-radius: 6px; cursor: pointer; }
+.inventory-table .card-name { font-weight: 500; color: #2d3748; margin-bottom: 3px; }
+.inventory-table .card-subtitle { font-size: 12px; color: #a0aec0; }
+
+/* Image Hover Preview */
+.image-cell { position: relative; }
+.image-preview { display: none; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); z-index: 9999; max-height: 300px; max-width: 220px; width: auto; height: auto; margin-left: 20px; box-shadow: 0 0 30px rgba(0,0,0,0.3); border: 3px solid #4299e1; border-radius: 12px; object-fit: contain; }
+.image-cell:hover .image-preview { display: block; }
+
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
+.pagination-info { font-size: 13px; color: #718096; }
+.pagination-buttons { display: flex; gap: 5px; align-items: center; }
+.pagination-btn { width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; color: #718096; transition: all 0.3s; }
+.pagination-btn:hover:not(.active) { background: #f7fafc; border-color: #cbd5e0; }
+.pagination-btn.active { background: #4299e1; color: white; border-color: #4299e1; }
+.pagination-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Right Sidebar - Search to Add */
+.right-sidebar { display: flex; flex-direction: column; gap: 20px; }
+.right-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: calc(100vh - 140px); overflow: visible; }
+.right-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+.right-card-header h4 { font-size: 16px; font-weight: 600; color: #2d3748; }
+.right-card-actions { display: flex; gap: 8px; }
+.icon-btn { width: 32px; height: 32px; border: none; background: #f7fafc; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #718096; transition: all 0.3s; }
+.icon-btn:hover { background: #e2e8f0; }
+
+/* Search Section */
+.search-section { margin-bottom: 16px; flex: 0 0 auto; }
+.search-section h4 { font-size: 16px; font-weight: 600; color: #2d3748; margin-bottom: 15px; }
+.search-input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+.search-input-group select { padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: white; flex: 1; }
+.search-input-group input { flex: 1; padding: 10px 15px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
+.btn-primary { background: #4299e1; color: white; width: 100%; }
+.btn-primary:hover { background: #3182ce; }
+.btn-primary:disabled { background: #cbd5e0; cursor: not-allowed; }
+.btn-secondary { background: #e2e8f0; color: #2d3748; }
+.btn-success { background: #48bb78; color: white; }
+.btn-danger { background: #f56565; color: white; }
+.btn-danger:hover { background: #e53e3e; }
+.btn-warning { background: #ed8936; color: white; }
+.btn-warning:hover { background: #dd6b20; }
+.btn-info { background: #4299e1; color: white; }
+.btn-info:hover { background: #3182ce; }
+.btn-sm { padding: 6px 10px; font-size: 11px; }
+.btn-xs { padding: 4px 8px; font-size: 10px; }
+.action-links { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+.action-links a { font-size: 11px; color: #4299e1; text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; transition: all 0.2s; }
+.action-links a:hover { color: #3182ce; background: #ebf8ff; text-decoration: none; }
+.action-links .link-ebay { color: #e5a83b; }
+.action-links .link-ebay:hover { color: #d4971e; background: #fef5e7; }
+.action-links .link-tcg { color: #4299e1; }
+.action-links .link-tcg:hover { color: #3182ce; background: #ebf8ff; }
+.action-links .link-sold { color: #888; font-size: 10px; }
+.btn-tcg { background: #4299e1; color: white; padding: 6px 12px; font-size: 12px; }
+.btn-tcg:hover { background: #3182ce; }
+
+/* Search Results */
+.search-results { margin-top: 15px; overflow: visible; min-height: 320px; }
+.search-results-list { max-height: 320px; overflow-y: auto; overflow-x: visible; padding-right: 4px; }
+.product-result { display: flex; gap: 10px; padding: 12px; background: #f7fafc; border-radius: 8px; margin-bottom: 8px; align-items: center; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
+.product-result:hover { border-color: #4299e1; background: #ebf8ff; }
+.product-result .card-thumb { width: 50px; height: auto; border-radius: 6px; }
+.search-results-list .image-preview { top: 0; transform: none; }
+.search-hover-preview { display: none; position: fixed; z-index: 9999; max-height: 300px; max-width: 220px; width: auto; height: auto; box-shadow: 0 0 30px rgba(0,0,0,0.3); border: 3px solid #4299e1; border-radius: 12px; object-fit: contain; pointer-events: none; background: white; }
+.product-result-info { flex: 1; }
+.product-result-info strong { display: block; margin-bottom: 3px; color: #2d3748; font-size: 13px; }
+.product-result-info small { color: #718096; font-size: 11px; }
+.product-result-price { text-align: right; }
+.product-result-price .price { font-size: 16px; font-weight: 700; color: #48bb78; }
+.product-result-price .market { font-size: 10px; color: #a0aec0; }
+
+/* Pending Products List */
+.pending-list { margin-top: 12px; flex: 1 1 auto; overflow-y: auto; padding-right: 4px; min-height: 220px; }
+.pending-list h4 { font-size: 16px; font-weight: 600; color: #2d3748; margin-bottom: 12px; }
+.pending-item { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+.pending-item-img { width: 50px; height: 70px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.pending-item-details { flex: 1; min-width: 0; }
+.pending-item-name { font-size: 12px; font-weight: 600; color: #2d3748; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pending-item-set { font-size: 10px; color: #718096; margin-top: 2px; }
+.pending-item-prices { margin-top: 4px; }
+.pending-item-cost { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.pending-item-cost input { border: 1px solid #e2e8f0; border-radius: 4px; text-align: center; }
+.pending-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.pending-item-actions .btn { padding: 5px 10px; font-size: 11px; border-radius: 4px; }
+.btn-remove { background: #e2e8f0; color: #718096; }
+.btn-remove:hover { background: #cbd5e0; }
+
+/* Confirmation Modal */
+.modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+.modal.show { display: flex; }
+.modal-content { background: white; padding: 30px; border-radius: 12px; max-width: 450px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+.modal-header { margin-bottom: 20px; }
+.modal-header h3 { font-size: 20px; font-weight: 600; color: #2d3748; }
+.modal-body { margin-bottom: 20px; }
+.modal-body p { color: #718096; line-height: 1.6; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions button { flex: 1; }
+
+.loading { text-align: center; padding: 40px; color: #a0aec0; }
+.notification { position: fixed; top: 90px; right: 30px; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 3000; animation: slideIn 0.3s ease; border-left: 4px solid #48bb78; }
+.notification.error { border-left-color: #f56565; }
+@keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.page-content { display: none; }
+.page-content.active { display: block; }
+
+.coming-soon { text-align: center; padding: 60px 20px; color: #a0aec0; }
+.coming-soon i { font-size: 48px; margin-bottom: 20px; }
+.coming-soon h3 { font-size: 24px; margin-bottom: 10px; color: #718096; }
+
+/* Pending Sales Styles - Order Card Layout */
+.pending-orders { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+.pending-order-card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden; }
+.pending-order-header { padding: 14px 16px; background: #f7fafc; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.pending-order-title { font-weight: 600; color: #2d3748; }
+.pending-order-sub { font-size: 12px; color: #718096; margin-top: 4px; }
+.pending-order-meta { text-align: right; font-size: 12px; color: #4a5568; }
+.pending-order-meta strong { color: #2d3748; }
+.pending-order-date { font-size: 12px; color: #718096; margin-top: 6px; }
+.pending-order-items { display: flex; flex-direction: column; }
+.pending-order-item { display: grid; grid-template-columns: 60px 1fr auto auto; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #edf2f7; }
+.pending-order-item:last-child { border-bottom: none; }
+.pending-order-item.expanded { background: #fff7ed; }
+.pending-order-item .card-image { width: 50px; height: 70px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; }
+.pending-order-item .card-image-placeholder { width: 50px; height: 70px; background: #f7fafc; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #cbd5e0; font-size: 24px; border: 1px solid #e2e8f0; }
+.pending-item-name { font-weight: 600; color: #2d3748; }
+.pending-item-meta { font-size: 12px; color: #718096; margin-top: 2px; }
+.pending-item-qty { font-weight: 600; color: #2d3748; }
+.pending-item-actions { display: flex; gap: 8px; }
+.pending-edit-form { display: none; padding: 16px; background: #fff7ed; border-top: 1px solid #fed7aa; }
+.pending-edit-form.show { display: block; }
+
+.pending-edit-form td {
+  padding: 20px;
+}
+
+.pending-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pending-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.pending-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 6px;
+}
+
+.pending-form-group input,
+.pending-form-group select {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.pending-form-group input:focus,
+.pending-form-group select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.pending-form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #fed7aa;
+}
+
+.pending-form-actions button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pending-form-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.btn-confirm-sale {
+  background: #48bb78;
+  color: white;
+}
+
+.btn-confirm-sale:hover {
+  background: #38a169;
+}
+
+.btn-delete-sale {
+  background: #f56565;
+  color: white;
+}
+
+.btn-delete-sale:hover {
+  background: #e53e3e;
+}
+
+.btn-cancel-edit {
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+.btn-cancel-edit:hover {
+  background: #cbd5e0;
+}
+
+.order-total-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #4299e1;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.condition-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #edf2f7;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #718096;
+  font-weight: 500;
+}
+
+.no-pending-message {
+  text-align: center;
+  padding: 60px 20px;
+  color: #718096;
+}
+
+.no-pending-message i {
+  font-size: 48px;
+  color: #cbd5e0;
+  margin-bottom: 16px;
+}
+
+.no-pending-message h4 {
+  margin: 16px 0 8px;
+  color: #2d3748;
+}
+
+</style>
+</head>
+<body>
+
+<!-- Top Navigation -->
+<div class="top-nav">
+  <div style="flex: 1;"></div>
+  <div class="nav-icons">
+    <div class="nav-icon"><i class="far fa-comment-alt"></i></div>
+    <div class="nav-icon"><i class="far fa-bell"></i></div>
+    <div class="user-avatar"><i class="fas fa-user"></i></div>
+    <div class="nav-icon"><i class="fas fa-th"></i></div>
+  </div>
+</div>
+
+<!-- Left Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <i class="fas fa-layer-group"></i>
+    <span>TCG Inventory</span>
+  </div>
+  
+  <ul class="sidebar-menu">
+    <li><a class="active" onclick="switchPage('dashboard', this)"><i class="fas fa-home"></i> Dashboard</a></li>
+    <li><a onclick="switchPage('inventory', this)"><i class="fas fa-box"></i> Inventory</a></li>
+    <li><a onclick="switchPage('sold', this)"><i class="fas fa-receipt"></i> Sold Items</a></li>
+    <li><a onclick="switchPage('analytics', this)"><i class="fas fa-chart-line"></i> Analytics</a></li>
+    <li><a onclick="switchPage('settings', this)"><i class="fas fa-cog"></i> Settings</a></li>
+  </ul>
+  
+  <div class="sidebar-logout">
+    <a href="#"><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+  <div class="main-section">
+    
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page-content active">
+      
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <i class="far fa-file-alt"></i>
+            <span>Pending Products</span>
+          </div>
+          <div class="stat-card-value" id="pendingCount">0</div>
+          <div class="stat-card-subtitle">No products pends your products your inventory</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <i class="fas fa-link"></i>
+            <span>Market Value</span>
+          </div>
+          <div class="stat-card-value" id="totalMarket">$0</div>
+          <div class="stat-card-subtitle"><i class="fas fa-bolt"></i>Stenderss added a low burings</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <i class="fas fa-chart-line"></i>
+            <span>Market Value</span>
+          </div>
+          <div class="stat-card-value" id="totalMarket2">$0</div>
+          <div class="stat-card-subtitle"><i class="fas fa-bolt"></i>Spelciupl: $841.15 nes kuatal</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <i class="fas fa-receipt"></i>
+            <span>Ask Price</span>
+          </div>
+          <div class="stat-card-value" id="totalAsk">$0</div>
+          <div class="stat-card-subtitle"><i class="fas fa-bolt"></i>Search:products as:prodded sites</div>
+        </div>
+      </div>
+      
+      <!-- Current Inventory Preview -->
+      <div class="content-card">
+        <div class="inventory-controls">
+          <span class="ask-label">Ask: <strong id="totalAskLabel">$0</strong></span>
+          <select id="showAllFilter">
+            <option value="all">Show All</option>
+            <option value="singles">Singles</option>
+            <option value="sealed">Sealed</option>
+          </select>
+          <select id="sortFilter">
+            <option value="latest">Sort: by latest</option>
+            <option value="name">Name</option>
+            <option value="price">Price</option>
+          </select>
+          <button class="btn btn-secondary sync-btn" onclick="syncData()" id="syncBtn">
+            <i class="fas fa-sync"></i> Sync
+          </button>
+        </div>
+        
+        <h3>Current Inventory</h3>
+        <div class="inventory-controls" style="margin-bottom: 15px; margin-top: -10px;">
+          <input type="text" id="dashboardSearchInput" placeholder="Search inventory..." style="padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; width: 250px; margin-right: 10px;" oninput="filterDashboardInventory()">
+          <select id="showPerPage" onchange="updateDashboardPerPage()">
+            <option value="5">Show 5</option>
+            <option value="10">Show 10</option>
+            <option value="25">Show 25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        
+        <div class="inventory-table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>IMAGE</th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('name')">CARD NAME <i class="fas fa-sort"></i></th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('qty')">QTY <i class="fas fa-sort"></i></th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('cost')">COST/EA <i class="fas fa-sort"></i></th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('total')">TOTAL <i class="fas fa-sort"></i></th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('ask')">ASK <i class="fas fa-sort"></i></th>
+                <th style="cursor: pointer;" onclick="sortDashboardBy('market')">MARKET <i class="fas fa-sort"></i></th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="dashboardTableBody">
+              <tr><td colspan="8" class="loading">Loading inventory...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="pagination">
+          <div class="pagination-info">Show <strong>5</strong></div>
+          <div class="pagination-buttons">
+            <button class="pagination-btn active">1</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Inventory Page (Full) -->
+    <div id="inventoryPage" class="page-content">
+      <div class="content-card">
+        <h3>Current Inventory</h3>
+        
+        <!-- Search and Filters -->
+        <div class="inventory-search-bar" style="margin-bottom: 20px;">
+          <div style="position: relative; flex: 1; max-width: 400px;">
+            <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #a0aec0;"></i>
+            <input type="text" id="inventorySearchInput" placeholder="Search here..." style="width: 100%; padding: 10px 15px 10px 40px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white;">
+          </div>
+        </div>
+        
+        <div class="inventory-controls">
+          <span class="ask-label">Ask: <strong id="inventoryAskLabel">$0</strong></span>
+          <select id="inventoryShowAllFilter" onchange="filterInventory()">
+            <option value="all">Show All</option>
+            <option value="singles">Singles</option>
+            <option value="sealed">Sealed</option>
+          </select>
+          <select id="inventorySortFilter" onchange="sortInventory()">
+            <option value="latest">Sort: by latest</option>
+            <option value="name">Name</option>
+            <option value="price">Price (High to Low)</option>
+            <option value="price_asc">Price (Low to High)</option>
+            <option value="market">Market</option>
+          </select>
+          <select id="inventoryShowPerPage" onchange="updatePerPage()">
+            <option value="25">Show 25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <button class="btn btn-secondary sync-btn" onclick="syncData()" id="inventorySyncBtn">
+            <i class="fas fa-sync"></i> Sync
+          </button>
+        </div>
+        
+        <div class="inventory-table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>IMAGE</th>
+                <th style="cursor: pointer;" onclick="sortByColumn('name')">
+                  CARD NAME <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th style="cursor: pointer;" onclick="sortByColumn('qty')">
+                  QTY <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th style="cursor: pointer;" onclick="sortByColumn('cost')">
+                  COST/EA <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th style="cursor: pointer;" onclick="sortByColumn('total')">
+                  TOTAL <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th style="cursor: pointer;" onclick="sortByColumn('ask')">
+                  ASK <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th style="cursor: pointer;" onclick="sortByColumn('market')">
+                  MARKET <i class="fas fa-sort" style="font-size: 10px; opacity: 0.5;"></i>
+                </th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <tr><td colspan="9" class="loading">Loading inventory...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="pagination">
+          <div class="pagination-info">Show <strong id="paginationInfo">0</strong></div>
+          <div class="pagination-buttons">
+            <button class="pagination-btn" onclick="prevPage()"><i class="fas fa-chevron-left"></i></button>
+            <button class="pagination-btn active" onclick="goToPage(1)">1</button>
+            <button class="pagination-btn" onclick="goToPage(2)">2</button>
+            <button class="pagination-btn" onclick="nextPage()"><i class="fas fa-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sold Items Page -->
+    <div id="soldPage" class="page-content">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-header"><i class="fas fa-box"></i> Items Sold</div>
+          <div class="stat-card-value" id="soldCount">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><i class="fas fa-dollar-sign"></i> Revenue</div>
+          <div class="stat-card-value" id="soldRevenue">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><i class="fas fa-chart-line"></i> Profit</div>
+          <div class="stat-card-value" id="soldProfit">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><i class="fas fa-clock"></i> Pending</div>
+          <div class="stat-card-value" id="pendingSalesCount">0</div>
+        </div>
+      </div>
+      
+      <!-- Pending Sales Section -->
+      <div class="content-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3>📬 Pending Sales (Need Confirmation)</h3>
+          <button class="btn btn-primary" onclick="scanEmails()">
+            <i class="fas fa-envelope"></i> Scan Emails
+          </button>
+        </div>
+        <div id="pendingSalesList"></div>
+      </div>
+      
+      <div class="content-card">
+        <h3>✅ Sold Items History</h3>
+        <div class="inventory-table-wrapper">
+          <table class="inventory-table">
+            <thead>
+              <tr>
+                <th>IMAGE</th>
+                <th>CARD NAME</th>
+                <th>QTY</th>
+                <th>COST/EA</th>
+                <th>SOLD PRICE</th>
+                <th>PROFIT</th>
+                <th>DATE</th>
+                <th>PLATFORM</th>
+              </tr>
+            </thead>
+            <tbody id="soldTableBody">
+              <tr><td colspan="8" class="loading">No sold items yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Analytics Page -->
+    <div id="analyticsPage" class="page-content">
+      <div class="content-card">
+        <div class="coming-soon">
+          <i class="fas fa-chart-bar"></i>
+          <h3>Analytics</h3>
+          <p>Coming Soon...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Settings Page -->
+    <div id="settingsPage" class="page-content">
+      <div class="content-card">
+        <h3>Email Settings for Sold Orders</h3>
+        <p style="color: #a0aec0; margin-bottom: 20px; font-size: 13px;">Configure your email to automatically scan for sold orders from TCGPlayer, eBay, and other platforms.</p>
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Email Address</label>
+          <input type="email" id="emailAddress" placeholder="your-email@gmail.com" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Email Password / App Password</label>
+          <input type="password" id="emailPassword" placeholder="Your email password or app-specific password" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <small style="color: #a0aec0; font-size: 12px; margin-top: 5px; display: block;">For Gmail, use an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #4299e1;">App Password</a></small>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">IMAP Server</label>
+          <input type="text" id="imapServer" value="imap.gmail.com" placeholder="imap.gmail.com" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <small style="color: #a0aec0; font-size: 12px; margin-top: 5px; display: block;">Gmail: imap.gmail.com | Outlook: imap-mail.outlook.com | Yahoo: imap.mail.yahoo.com</small>
+        </div>
+        
+        <div style="padding: 15px; background: #f7fafc; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #4299e1;">
+          <strong style="display: block; margin-bottom: 5px; color: #2d3748;">🔒 Privacy & Security:</strong>
+          <small style="color: #718096; display: block;">Your credentials are stored locally and never sent to external servers. We recommend using app-specific passwords for added security.</small>
+        </div>
+      </div>
+      
+      <div class="content-card" style="margin-top: 20px;">
+        <h3>TCGPlayer Settings</h3>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">TCGPlayer Store Username</label>
+          <input type="text" id="tcgUsername" placeholder="Your TCGPlayer store username" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <small style="color: #a0aec0; font-size: 12px; margin-top: 5px; display: block;">This will be used to scrape your store inventory</small>
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Auto-Scan Emails</label>
+          <select id="autoScan" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <option value="disabled">Disabled</option>
+            <option value="startup">On Startup</option>
+            <option value="interval">Every 5 Minutes</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()" style="width: auto;">
+          <i class="fas fa-save"></i> Save Settings
+        </button>
+        
+        <div style="margin-top: 40px; padding-top: 40px; border-top: 1px solid #e2e8f0;">
+          <p style="color: #a0aec0; font-size: 13px;">More settings coming soon...</p>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- Right Sidebar - Search to Add -->
+  <div class="right-sidebar">
+    <div class="right-card">
+      <div class="right-card-header">
+        <h4>Search to Add</h4>
+        <div class="right-card-actions">
+          <button class="icon-btn" onclick="clearPendingList()"><i class="fas fa-trash"></i></button>
+          <button class="icon-btn"><i class="fas fa-cog"></i></button>
+        </div>
+      </div>
+      
+      <!-- Search Section -->
+      <div class="search-section">
+        <div class="search-input-group">
+          <select id="gameSelect">
+            <option value="pokemon">Pokémon</option>
+            <option value="magic">Magic</option>
+            <option value="yugioh">Yu-Gi-Oh</option>
+            <option value="one-piece-card-game">One Piece</option>
+          </select>
+        </div>
+        <div class="search-input-group">
+          <input type="text" id="productSearchInput" placeholder="Enter product name...">
+        </div>
+        <button class="btn btn-primary" onclick="searchProducts()">
+          <i class="fas fa-search"></i> Search
+        </button>
+        
+        <div id="searchResults" class="search-results"></div>
+      </div>
+      
+      <!-- Pending Products List -->
+      <div class="pending-list">
+        <h4>Pending Products (<span id="pendingListCount">0</span>)</h4>
+        <div id="pendingProductsList">
+          <p style="color: #a0aec0; text-align: center; padding: 20px; font-size: 13px;">No pending products. Search and add products above.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<img id="searchHoverPreview" class="search-hover-preview" alt="Preview" />
+
+<!-- Confirmation Modal -->
+<div id="confirmModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Confirm Product Listing</h3>
+    </div>
+    <div class="modal-body">
+      <p id="modalMessage">Have you listed this product on TCGPlayer?</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-success" onclick="confirmListed()">
+        <i class="fas fa-check"></i> Listed on TCG
+      </button>
+      <button class="btn btn-secondary" onclick="notNow()">
+        Not Now
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let inventoryData = [];
+let filteredInventoryData = [];
+let soldItems = JSON.parse(localStorage.getItem('soldItems') || '[]');
+let pendingProducts = JSON.parse(localStorage.getItem('pendingProducts') || '[]');
+let currentPage = 1;
+let itemsPerPage = 25;
+let currentProductToConfirm = null;
+let currentTCGTab = null;
+let sortColumn = null;
+let sortDirection = 'asc';
+let ebayCampaignId = '5339137036'; // Default campaign ID
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadInventory();
+  loadSoldItemsFromServer(); // Load from server instead of localStorage
+  loadSettings();
+  renderPendingList();
+  loadPendingSales(); // Also load pending sales on startup
+  
+  // Add search event listener
+  document.getElementById('inventorySearchInput').addEventListener('input', function() {
+    filterInventory();
+  });
+
+  const productSearchInput = document.getElementById('productSearchInput');
+  if (productSearchInput) {
+    productSearchInput.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchProducts();
+      }
+    });
+  }
+});
+
+function switchPage(pageName, el) {
+  document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageName + 'Page').classList.add('active');
+
+  document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  if (pageName === 'inventory') renderFullInventory();
+  else if (pageName === 'sold') {
+    loadSoldItemsFromServer();
+    loadPendingSales();
+  }
+}
+
+
+async function loadInventory() {
+  try {
+    const response = await fetch('/api/inventory');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      inventoryData = data.items || [];
+      filteredInventoryData = [...inventoryData]; // Initialize filtered data
+      renderDashboardTable();
+      renderFullInventory();
+      updateStats();
+    }
+  } catch (error) {
+    console.error('Error loading inventory:', error);
+  }
+}
+
+let dashboardSortColumn = '';
+let dashboardSortDirection = 'asc';
+let dashboardFilteredData = [];
+let dashboardItemsPerPage = 5;
+
+function updateDashboardPerPage() {
+  dashboardItemsPerPage = parseInt(document.getElementById('showPerPage').value);
+  renderDashboardTable();
+}
+
+function filterDashboardInventory() {
+  const searchTerm = document.getElementById('dashboardSearchInput').value.toLowerCase();
+  
+  if (!searchTerm) {
+    dashboardFilteredData = [];
+    renderDashboardTable();
+    return;
+  }
+  
+  dashboardFilteredData = inventoryData.filter(item => {
+    return (item.name && item.name.toLowerCase().includes(searchTerm)) ||
+      (item.display_name && item.display_name.toLowerCase().includes(searchTerm)) ||
+      (item.set_name && item.set_name.toLowerCase().includes(searchTerm)) ||
+      (item.card_number && item.card_number.toLowerCase().includes(searchTerm));
+  });
+  
+  renderDashboardTable();
+}
+
+function sortDashboardBy(column) {
+  if (dashboardSortColumn === column) {
+    dashboardSortDirection = dashboardSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    dashboardSortColumn = column;
+    dashboardSortDirection = 'asc';
+  }
+  
+  const dataToSort = dashboardFilteredData.length > 0 ? dashboardFilteredData : inventoryData;
+  
+  dataToSort.sort((a, b) => {
+    let aVal, bVal;
+    
+    switch(column) {
+      case 'name':
+        aVal = (a.display_name || a.name || '').toLowerCase();
+        bVal = (b.display_name || b.name || '').toLowerCase();
+        break;
+      case 'qty':
+        aVal = a.qty || 0;
+        bVal = b.qty || 0;
+        break;
+      case 'cost':
+        aVal = a.cost || 0;
+        bVal = b.cost || 0;
+        break;
+      case 'total':
+        aVal = (a.cost || 0) * (a.qty || 1);
+        bVal = (b.cost || 0) * (b.qty || 1);
+        break;
+      case 'ask':
+        aVal = parseFloat(a.price) || 0;
+        bVal = parseFloat(b.price) || 0;
+        break;
+      case 'market':
+        aVal = a.market || 0;
+        bVal = b.market || 0;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (typeof aVal === 'string') {
+      return dashboardSortDirection === 'asc' 
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal);
+    } else {
+      return dashboardSortDirection === 'asc' 
+        ? aVal - bVal
+        : bVal - aVal;
+    }
+  });
+  
+  renderDashboardTable();
+}
+
+function renderDashboardTable() {
+  const tbody = document.getElementById('dashboardTableBody');
+  const dataToRender = dashboardFilteredData.length > 0 ? dashboardFilteredData : inventoryData;
+  
+  if (dataToRender.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">No inventory items. Click Sync to load.</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = dataToRender.slice(0, dashboardItemsPerPage).map(item => {
+    const name = item.display_name || item.name;
+    const price = parseFloat(item.price) || 0;
+    const market = item.market || 0;
+    const qty = item.qty || 1;
+    const cost = item.cost || 0;
+    const total = cost * qty;
+    const image = item.image || 'https://via.placeholder.com/60?text=Card';
+    const productId = item.tcg_product_id || item.productId || item.product_id || '';
+    const cardName = encodeURIComponent(name);
+    
+    return `<tr>
+      <td>
+        <div class="image-cell">
+          <img src="${image}" class="card-image" onerror="this.src='https://via.placeholder.com/60?text=Card'">
+          <img class="image-preview" src="${image}" onerror="this.src='https://via.placeholder.com/250?text=Card'">
+        </div>
+      </td>
+      <td>
+        <div class="card-name">${name}</div>
+        <div class="card-subtitle">${item.set_name || 'Unknown Set'}</div>
+      </td>
+      <td>${qty}</td>
+      <td>$${cost.toFixed(2)}</td>
+      <td>$${total.toFixed(2)}</td>
+      <td>$${price.toFixed(2)}</td>
+      <td>$${market.toFixed(2)}</td>
+      <td>
+        <div class="action-links">
+          <a href="https://www.ebay.com/sch/i.html?_nkw=${cardName}&LH_Sold=1&LH_Complete=1" target="_blank" class="link-ebay" title="eBay Sold Comps">
+            <i class="fab fa-ebay"></i> eBay Sold
+          </a>
+          <a href="https://www.ebay.com/sh/lst/active?campaignId=${ebayCampaignId}" target="_blank" class="link-ebay" title="eBay My Listings">
+            <i class="fas fa-list"></i> eBay Listing
+          </a>
+          ${productId ? 
+            `<a href="https://www.tcgplayer.com/product/${productId}" target="_blank" class="link-tcg" title="TCG Product Page"><i class="fas fa-external-link-alt"></i> TCG Page</a>` : 
+            `<span class="link-sold"><i class="fas fa-external-link-alt"></i> TCG Page (No ID)</span>`
+          }
+          ${productId ? 
+            `<a href="https://store.tcgplayer.com/admin/product/manage/${productId}" target="_blank" class="link-tcg" title="Edit on TCG"><i class="fas fa-edit"></i> Edit TCG</a>` : 
+            `<span class="link-sold"><i class="fas fa-edit"></i> Edit TCG (No ID)</span>`
+          }
+          <span class="link-sold"><i class="fas fa-clock"></i> List on eBay (Soon)</span>
+          <button class="btn btn-danger btn-xs" onclick='markAsSold(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="width: 100%; margin-top: 4px;">
+            <i class="fas fa-check-circle"></i> Sold
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  
+  // Update the dashboard pagination info
+  const dashboardPaginationInfo = document.querySelector('#dashboardPage .pagination-info strong');
+  if (dashboardPaginationInfo) {
+    dashboardPaginationInfo.textContent = Math.min(dashboardItemsPerPage, dataToRender.length);
+  }
+}
+
+function renderFullInventory() {
+  const tbody = document.getElementById('inventoryTableBody');
+  const dataToRender = filteredInventoryData.length > 0 || document.getElementById('inventorySearchInput').value ? filteredInventoryData : inventoryData;
+  
+  if (dataToRender.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">No items found</td></tr>';
+    document.getElementById('paginationInfo').textContent = '0';
+    return;
+  }
+  
+  const start = (currentPage - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  const pageItems = dataToRender.slice(start, end);
+  
+  tbody.innerHTML = pageItems.map(item => {
+    const name = item.display_name || item.name;
+    const price = parseFloat(item.price) || 0;
+    const market = item.market || 0;
+    const qty = item.qty || 1;
+    const cost = item.cost || 0;
+    const total = cost * qty;
+    const image = item.image || 'https://via.placeholder.com/60?text=Card';
+    const productId = item.tcg_product_id || item.productId || item.product_id || '';
+    const cardName = encodeURIComponent(name);
+    
+    return `<tr>
+      <td>
+        <div class="image-cell">
+          <img src="${image}" class="card-image" onerror="this.src='https://via.placeholder.com/60?text=Card'">
+          <img class="image-preview" src="${image}" onerror="this.src='https://via.placeholder.com/250?text=Card'">
+        </div>
+      </td>
+      <td>
+        <div class="card-name">${name}</div>
+        <div class="card-subtitle">${item.set_name || 'Unknown Set'}</div>
+      </td>
+      <td>${qty}</td>
+      <td>$${cost.toFixed(2)}</td>
+      <td>$${total.toFixed(2)}</td>
+      <td>$${price.toFixed(2)}</td>
+      <td>$${market.toFixed(2)}</td>
+      <td>
+        <div class="action-links">
+          <a href="https://www.ebay.com/sch/i.html?_nkw=${cardName}&LH_Sold=1&LH_Complete=1" target="_blank" class="link-ebay" title="eBay Sold Comps">
+            <i class="fab fa-ebay"></i> eBay Sold
+          </a>
+          <a href="https://www.ebay.com/sh/lst/active?campaignId=${ebayCampaignId}" target="_blank" class="link-ebay" title="eBay My Listings">
+            <i class="fas fa-list"></i> eBay Listing
+          </a>
+          ${productId ? 
+            `<a href="https://www.tcgplayer.com/product/${productId}" target="_blank" class="link-tcg" title="TCG Product Page"><i class="fas fa-external-link-alt"></i> TCG Page</a>` : 
+            `<span class="link-sold"><i class="fas fa-external-link-alt"></i> TCG Page (No ID)</span>`
+          }
+          ${productId ? 
+            `<a href="https://store.tcgplayer.com/admin/product/manage/${productId}" target="_blank" class="link-tcg" title="Edit on TCG"><i class="fas fa-edit"></i> Edit TCG</a>` : 
+            `<span class="link-sold"><i class="fas fa-edit"></i> Edit TCG (No ID)</span>`
+          }
+          <span class="link-sold"><i class="fas fa-clock"></i> List on eBay (Soon)</span>
+          <button class="btn btn-danger btn-xs" onclick='markAsSold(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="width: 100%; margin-top: 4px;">
+            <i class="fas fa-check-circle"></i> Sold
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  
+  document.getElementById('paginationInfo').textContent = Math.min(end, dataToRender.length);
+  renderPaginationButtons(dataToRender.length);
+}
+
+function renderPaginationButtons(totalItems) {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const buttonsContainer = document.querySelector('.pagination-buttons');
+  
+  if (!buttonsContainer) return;
+  
+  const prevDisabled = currentPage <= 1;
+  const nextDisabled = currentPage >= totalPages;
+  
+  let buttonsHTML = `<button class="pagination-btn" onclick="prevPage()" ${prevDisabled ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>`;
+  
+  // Show max 5 page buttons
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + 4);
+  
+  if (endPage - startPage < 4) {
+    startPage = Math.max(1, endPage - 4);
+  }
+  
+  if (startPage > 1) {
+    buttonsHTML += '<button class="pagination-btn" onclick="goToPage(1)">1</button>';
+    if (startPage > 2) {
+      buttonsHTML += '<span style="padding: 0 8px; color: #a0aec0;">...</span>';
+    }
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    buttonsHTML += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+  }
+  
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      buttonsHTML += '<span style="padding: 0 8px; color: #a0aec0;">...</span>';
+    }
+    buttonsHTML += `<button class="pagination-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+  }
+  
+  buttonsHTML += `<button class="pagination-btn" onclick="nextPage()" ${nextDisabled ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+  
+  buttonsContainer.innerHTML = buttonsHTML;
+}
+
+function sortInventory() {
+  const sortBy = document.getElementById('inventorySortFilter').value;
+  const data = filteredInventoryData.length > 0 ? filteredInventoryData : inventoryData;
+  
+  switch(sortBy) {
+    case 'name':
+      data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      break;
+    case 'price':
+      data.sort((a, b) => (b.price || 0) - (a.price || 0));
+      break;
+    case 'price_asc':
+      data.sort((a, b) => (a.price || 0) - (b.price || 0));
+      break;
+    case 'market':
+      data.sort((a, b) => (b.market || 0) - (a.market || 0));
+      break;
+    default:
+      // latest - do nothing, keep original order
+      break;
+  }
+  
+  renderFullInventory();
+}
+
+function updateStats() {
+  const totalAsk = inventoryData.reduce((sum, item) => sum + (parseFloat(item.price) || 0) * (item.qty || 1), 0);
+  const totalMarket = inventoryData.reduce((sum, item) => sum + (item.market || 0) * (item.qty || 1), 0);
+  
+  document.getElementById('totalAsk').textContent = '$' + totalAsk.toFixed(2);
+  document.getElementById('totalAskLabel').textContent = '$' + totalAsk.toFixed(2);
+  document.getElementById('inventoryAskLabel').textContent = '$' + totalAsk.toFixed(2);
+  document.getElementById('totalMarket').textContent = '$' + totalMarket.toFixed(2);
+  document.getElementById('totalMarket2').textContent = '$' + totalMarket.toFixed(2);
+  document.getElementById('pendingCount').textContent = pendingProducts.length;
+}
+
+async function syncData() {
+  const btn = event.target.closest('button');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Syncing...';
+  
+  try {
+    const response = await fetch('/sync', { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification('✅ Sync complete!');
+      setTimeout(() => loadInventory(), 3000);
+    } else {
+      showNotification('❌ ' + data.message);
+    }
+  } catch (error) {
+    showNotification('❌ Error: ' + error.message);
+  } finally {
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-sync"></i> Sync';
+    }, 2000);
+  }
+}
+
+async function searchProducts() {
+  const query = document.getElementById('productSearchInput').value.trim();
+  const game = document.getElementById('gameSelect').value;
+  const resultsDiv = document.getElementById('searchResults');
+  
+  if (!query) {
+    resultsDiv.innerHTML = '<p style="color:#a0aec0;padding:15px;text-align:center;font-size:12px;">Enter a search term</p>';
+    return;
+  }
+  
+  resultsDiv.innerHTML = '<div class="loading" style="padding:20px;font-size:13px;">Searching...</div>';
+  
+  try {
+    const response = await fetch(`/search-products?q=${encodeURIComponent(query)}&game=${game}`);
+    const data = await response.json();
+    
+    if (data.status === 'success' && data.results.length > 0) {
+      resultsDiv.innerHTML = `
+        <div class="search-results-list">
+          ${data.results.slice(0, 25).map(product => `
+            <div class="product-result" data-image="${product.imageUrl || ''}" onclick='addToPending(${JSON.stringify(product).replace(/'/g, "&#39;")})'>
+              <div class="image-cell">
+                <img class="card-thumb" src="${product.imageUrl || 'https://via.placeholder.com/50'}" onerror="this.src='https://via.placeholder.com/50'">
+              </div>
+              <div class="product-result-info">
+                <strong>${(product.number ? product.name + ' ' + product.number : product.name).substring(0, 40)}${(product.number ? product.name + ' ' + product.number : product.name).length > 40 ? '...' : ''}</strong>
+                <small>${product.set}</small>
+              </div>
+              <div class="product-result-price">
+                <div class="price">$${(product.marketPrice || 0).toFixed(2)}</div>
+                <div class="market">Market</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      attachSearchHoverPreview();
+    } else {
+      resultsDiv.innerHTML = '<p style="color:#a0aec0;padding:15px;text-align:center;font-size:12px;">No results found</p>';
+    }
+  } catch (error) {
+    resultsDiv.innerHTML = '<p style="color:#e53e3e;padding:15px;text-align:center;font-size:12px;">Search error</p>';
+  }
+}
+
+function addToPending(product) {
+  // Check if already in pending
+  const existing = pendingProducts.find(p => p.productId === product.productId);
+  if (existing) {
+    showNotification('⚠️ Product already in pending list');
+    return;
+  }
+  
+  pendingProducts.push({
+    productId: product.productId,
+    name: product.number ? product.name + ' ' + product.number : product.name,
+    set: product.set,
+    image: product.imageUrl,
+    marketPrice: product.marketPrice || 0,
+    lowestPrice: product.lowestPrice || 0
+  });
+  
+  localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  renderPendingList();
+  updateStats();
+  showNotification('✅ Added to pending list');
+}
+
+function renderPendingList() {
+  const container = document.getElementById('pendingProductsList');
+  const countEl = document.getElementById('pendingListCount');
+  
+  countEl.textContent = pendingProducts.length;
+  
+  if (pendingProducts.length === 0) {
+    container.innerHTML = '<p style="color: #a0aec0; text-align: center; padding: 20px; font-size: 13px;">No pending products. Search and add products above.</p>';
+    return;
+  }
+  
+  container.innerHTML = pendingProducts.map((product, index) => `
+    <div class="pending-item">
+      <img src="${product.image || 'https://via.placeholder.com/50'}" onerror="this.src='https://via.placeholder.com/50'" class="pending-item-img">
+      <div class="pending-item-details">
+        <div class="pending-item-name">${product.name}</div>
+        <div class="pending-item-set">${product.set || 'Unknown Set'}</div>
+        <div class="pending-item-prices">
+          <span style="color: #4299e1; font-size: 11px;">TCG: $${(product.lowestPrice || 0).toFixed(2)}</span>
+          <span style="color: #48bb78; font-size: 11px; margin-left: 10px;">Market: $${(product.marketPrice || 0).toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="pending-item-cost">
+        <input type="number" step="0.01" min="0" value="${product.cost ?? ''}" placeholder="$" title="Cost ($)"
+          oninput="updatePendingCost(${index}, this.value)" style="width: 60px; padding: 4px 6px; font-size: 11px;">
+        <input type="number" step="1" min="0" max="200" value="${product.cost_percent ?? ''}" placeholder="%" title="Cost (%)"
+          oninput="updatePendingCostPercent(${index}, this.value)" style="width: 50px; padding: 4px 6px; font-size: 11px;">
+      </div>
+      <div class="pending-item-actions">
+        <button class="btn btn-tcg" onclick="listOnTCG('${product.productId}', '${product.name.replace(/'/g, "\\'")}', ${index})" title="List on TCGPlayer">
+          <i class="fas fa-external-link-alt"></i>
+        </button>
+        <button class="btn btn-remove" onclick="removeFromPending(${index})" title="Remove from pending">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updatePendingCost(index, value) {
+  const cost = parseFloat(value);
+  const market = pendingProducts[index].marketPrice || 0;
+  if (!Number.isNaN(cost)) {
+    pendingProducts[index].cost = Number(cost.toFixed(2));
+    if (market > 0) {
+      pendingProducts[index].cost_percent = Math.round((cost / market) * 100);
+    }
+  } else {
+    delete pendingProducts[index].cost;
+    delete pendingProducts[index].cost_percent;
+  }
+  localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  renderPendingList();
+}
+
+function updatePendingCostPercent(index, value) {
+  const pct = parseFloat(value);
+  const market = pendingProducts[index].marketPrice || 0;
+  if (!Number.isNaN(pct) && market > 0) {
+    const computed = (market * pct) / 100;
+    pendingProducts[index].cost = Number(computed.toFixed(2));
+    pendingProducts[index].cost_percent = Math.round(pct);
+  } else if (Number.isNaN(pct)) {
+    delete pendingProducts[index].cost_percent;
+  }
+  localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+  renderPendingList();
+}
+
+function attachSearchHoverPreview() {
+  const results = document.querySelectorAll('.product-result');
+  const preview = document.getElementById('searchHoverPreview');
+  if (!preview) return;
+
+  const list = document.querySelector('.search-results-list');
+  if (list) {
+    list.addEventListener('scroll', () => {
+      preview.style.display = 'none';
+    });
+  }
+
+  results.forEach((row) => {
+    row.addEventListener('mouseenter', () => {
+      const src = row.getAttribute('data-image');
+      if (!src) return;
+      preview.src = src;
+      preview.style.display = 'block';
+    });
+
+    row.addEventListener('mousemove', () => {
+      if (preview.style.display !== 'block') return;
+      const rect = row.getBoundingClientRect();
+      const top = Math.max(20, Math.min(window.innerHeight - 320, rect.top));
+      const left = Math.min(window.innerWidth - 240, rect.right + 16);
+      preview.style.top = `${top}px`;
+      preview.style.left = `${left}px`;
+    });
+
+    row.addEventListener('mouseleave', () => {
+      preview.style.display = 'none';
+    });
+  });
+}
+
+function listOnTCG(productId, productName, index) {
+  const tcgUrl = `https://store.tcgplayer.com/admin/product/manage/${productId}`;
+  
+  // Store current product for confirmation
+  currentProductToConfirm = { index, productId, productName };
+  
+  // Open TCGPlayer in new tab
+  currentTCGTab = window.open(tcgUrl, '_blank');
+  
+  // Show confirmation modal after a short delay
+  setTimeout(() => {
+    document.getElementById('modalMessage').textContent = `Have you listed "${productName}" on TCGPlayer?`;
+    document.getElementById('confirmModal').classList.add('show');
+  }, 2000);
+}
+
+function confirmListed() {
+  if (currentProductToConfirm) {
+    // Remove from pending list
+    pendingProducts.splice(currentProductToConfirm.index, 1);
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    
+    renderPendingList();
+    updateStats();
+    showNotification('✅ Product confirmed as listed on TCGPlayer!');
+    
+    // Notify server
+    fetch('/mark-added', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: currentProductToConfirm.productId })
+    });
+  }
+
+  if (currentTCGTab && !currentTCGTab.closed) {
+    currentTCGTab.close();
+  }
+  
+  document.getElementById('confirmModal').classList.remove('show');
+  currentProductToConfirm = null;
+  currentTCGTab = null;
+}
+
+function notNow() {
+  document.getElementById('confirmModal').classList.remove('show');
+  currentProductToConfirm = null;
+  showNotification('Product remains in pending list');
+}
+
+function removeFromPending(index) {
+  if (confirm('Remove this product from pending list?')) {
+    pendingProducts.splice(index, 1);
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    renderPendingList();
+    updateStats();
+    showNotification('Removed from pending list');
+  }
+}
+
+function clearPendingList() {
+  if (confirm('Clear all pending products?')) {
+    pendingProducts = [];
+    localStorage.setItem('pendingProducts', JSON.stringify(pendingProducts));
+    renderPendingList();
+    updateStats();
+    showNotification('Pending list cleared');
+  }
+}
+
+function markAsSold(item) {
+  const soldPrice = prompt(`Enter sold price for ${item.name}:`, item.market || item.price);
+  if (!soldPrice) return;
+  
+  const soldItem = {
+    ...item,
+    soldDate: new Date().toISOString(),
+    soldPrice: parseFloat(soldPrice),
+    platform: 'TCGPlayer'
+  };
+  
+  soldItems.push(soldItem);
+  localStorage.setItem('soldItems', JSON.stringify(soldItems));
+  
+  showNotification('✅ Item marked as sold!');
+  loadSoldItems();
+}
+
+function loadSoldItems() {
+  const soldCount = soldItems.length;
+  const soldRevenue = soldItems.reduce((sum, item) => sum + ((item.sold_price || item.soldPrice || 0) * (item.qty || 1)), 0);
+  const soldCost = soldItems.reduce((sum, item) => sum + ((item.cost || 0) * (item.qty || 1)), 0);
+  const soldProfit = soldRevenue - soldCost;
+  
+  document.getElementById('soldCount').textContent = soldCount;
+  document.getElementById('soldRevenue').textContent = '$' + soldRevenue.toFixed(2);
+  document.getElementById('soldProfit').textContent = '$' + soldProfit.toFixed(2);
+  
+  const tbody = document.getElementById('soldTableBody');
+  if (soldItems.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">No sold items yet</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = soldItems.map(item => {
+    const qty = item.qty || 1;
+    const cost = item.cost || 0;
+    const soldPrice = item.sold_price || item.soldPrice || item.price || 0;
+    const profit = (soldPrice - cost) * qty;
+    const image = item.image || 'https://via.placeholder.com/60?text=Card';
+    const soldDate = item.sold_date || item.soldDate || new Date().toISOString().split('T')[0];
+    
+    return `<tr>
+      <td>
+        <div class="image-cell">
+          <img src="${image}" class="card-image" onerror="this.src='https://via.placeholder.com/60?text=Card'">
+          <img class="image-preview" src="${image}" onerror="this.src='https://via.placeholder.com/250?text=Card'">
+        </div>
+      </td>
+      <td>
+        <div class="card-name">${item.name}</div>
+        <div class="card-subtitle">${item.set_name || ''}</div>
+      </td>
+      <td>${qty}</td>
+      <td>$${cost.toFixed(2)}</td>
+      <td>$${soldPrice.toFixed(2)}</td>
+      <td style="color:${profit >= 0 ? '#48bb78' : '#f56565'}">$${profit.toFixed(2)}</td>
+      <td>${new Date(soldDate).toLocaleDateString()}</td>
+      <td>${item.platform || 'TCGPlayer'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadSettings() {
+  try {
+    const response = await fetch('/api/settings');
+    const data = await response.json();
+    if (data.status === 'success' && data.settings) {
+      document.getElementById('tcgUsername').value = data.settings.tcgplayer_username || '';
+      document.getElementById('autoScan').value = data.settings.auto_scan || 'disabled';
+      document.getElementById('emailAddress').value = data.settings.email_address || '';
+      document.getElementById('emailPassword').value = data.settings.email_password || '';
+      document.getElementById('imapServer').value = data.settings.imap_server || 'imap.gmail.com';
+    }
+  } catch (error) {
+    console.error('Error loading settings:', error);
+  }
+}
+
+async function saveSettings() {
+  const settings = {
+    tcgplayer_username: document.getElementById('tcgUsername').value,
+    auto_scan: document.getElementById('autoScan').value,
+    email_address: document.getElementById('emailAddress').value,
+    email_password: document.getElementById('emailPassword').value,
+    imap_server: document.getElementById('imapServer').value
+  };
+  
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      showNotification('✅ Settings saved!');
+    }
+  } catch (error) {
+    showNotification('❌ Error saving settings');
+  }
+}
+
+function filterInventory() { 
+  const searchTerm = document.getElementById('inventorySearchInput').value.toLowerCase();
+  const filterType = document.getElementById('inventoryShowAllFilter').value;
+  
+  // Start with all inventory
+  filteredInventoryData = inventoryData.filter(item => {
+    // Search filter
+    const matchesSearch = !searchTerm || 
+      (item.name && item.name.toLowerCase().includes(searchTerm)) ||
+      (item.display_name && item.display_name.toLowerCase().includes(searchTerm)) ||
+      (item.set_name && item.set_name.toLowerCase().includes(searchTerm)) ||
+      (item.card_number && item.card_number.toLowerCase().includes(searchTerm));
+    
+    // Type filter
+    const matchesType = filterType === 'all' || 
+      (filterType === 'singles' && item.type === 'single') ||
+      (filterType === 'sealed' && item.type === 'sealed');
+    
+    return matchesSearch && matchesType;
+  });
+  
+  currentPage = 1; // Reset to first page
+  renderFullInventory();
+}
+
+function sortByColumn(column) {
+  // Toggle sort direction if clicking same column
+  if (sortColumn === column) {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortColumn = column;
+    sortDirection = 'asc';
+  }
+  
+  const data = filteredInventoryData.length > 0 ? filteredInventoryData : inventoryData;
+  
+  data.sort((a, b) => {
+    let aVal, bVal;
+    
+    switch(column) {
+      case 'name':
+        aVal = (a.display_name || a.name || '').toLowerCase();
+        bVal = (b.display_name || b.name || '').toLowerCase();
+        break;
+      case 'qty':
+        aVal = a.qty || 0;
+        bVal = b.qty || 0;
+        break;
+      case 'cost':
+        aVal = a.cost || 0;
+        bVal = b.cost || 0;
+        break;
+      case 'total':
+        aVal = (a.cost || 0) * (a.qty || 1);
+        bVal = (b.cost || 0) * (b.qty || 1);
+        break;
+      case 'ask':
+        aVal = parseFloat(a.price) || 0;
+        bVal = parseFloat(b.price) || 0;
+        break;
+      case 'market':
+        aVal = a.market || 0;
+        bVal = b.market || 0;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (typeof aVal === 'string') {
+      return sortDirection === 'asc' 
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal);
+    } else {
+      return sortDirection === 'asc' 
+        ? aVal - bVal
+        : bVal - aVal;
+    }
+  });
+  
+  renderFullInventory();
+}
+function updatePerPage() {
+  itemsPerPage = parseInt(document.getElementById('inventoryShowPerPage').value);
+  currentPage = 1;
+  renderFullInventory();
+}
+function prevPage() { 
+  if (currentPage > 1) { 
+    currentPage--; 
+    renderFullInventory(); 
+  } 
+}
+function nextPage() {
+  const dataToRender = filteredInventoryData.length > 0 || document.getElementById('inventorySearchInput').value ? filteredInventoryData : inventoryData;
+  const maxPage = Math.ceil(dataToRender.length / itemsPerPage);
+  if (currentPage < maxPage) { 
+    currentPage++; 
+    renderFullInventory(); 
+  }
+}
+function goToPage(page) { currentPage = page; renderFullInventory(); }
+
+function showNotification(message, type = 'success') {
+  const notification = document.createElement('div');
+  notification.className = 'notification' + (type === 'error' ? ' error' : '');
+  notification.innerHTML = message;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 3000);
+}
+
+// Pending Sales Management
+let pendingSales = [];
+
+async function loadPendingSales() {
+  try {
+    const response = await fetch('/api/sold/pending');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      pendingSales = data.sales || [];
+      renderPendingSales();
+      document.getElementById('pendingSalesCount').textContent = pendingSales.length;
+    }
+  } catch (error) {
+    console.error('Error loading pending sales:', error);
+  }
+}
+
+function renderPendingSales() {
+  const container = document.getElementById('pendingSalesList');
+  
+  if (!pendingSales || pendingSales.length === 0) {
+    container.innerHTML = `
+      <div class="no-pending-message">
+        <i class="fas fa-inbox"></i>
+        <h4>No Pending Sales</h4>
+        <p>Click "Scan Emails" above to import orders from your TCGplayer emails.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Group by order ID
+  const orderGroups = {};
+  pendingSales.forEach(sale => {
+    const orderId = sale.order_id || 'no-order';
+    if (!orderGroups[orderId]) {
+      orderGroups[orderId] = {
+        order_id: orderId,
+        order_total: sale.order_total || 0,
+        platform: sale.platform || 'Unknown',
+        date: sale.sold_date || 'Unknown',
+        items: []
+      };
+    }
+    orderGroups[orderId].items.push(sale);
+  });
+  
+  container.innerHTML = `
+    <div class="pending-orders">
+      ${Object.values(orderGroups).map(order => {
+        const totalQty = order.items.reduce((sum, item) => sum + (item.qty || 1), 0);
+        const headline = order.items[0]?.name || 'Order';
+        const moreCount = order.items.length > 1 ? ` + ${order.items.length - 1} more` : '';
+        const orderDate = order.date || order.items[0]?.sold_date || 'Unknown';
+        const orderTotal = order.order_total || 0;
+
+        return `
+          <div class="pending-order-card">
+            <div class="pending-order-header">
+              <div>
+                <div class="pending-order-title">📦 ${headline}${moreCount}</div>
+                <div class="pending-order-sub">QTY: ${totalQty} • ORDER ID: ${order.order_id !== 'no-order' ? order.order_id : 'N/A'}</div>
+                <div class="pending-order-date">DATE: ${orderDate}</div>
+              </div>
+              <div class="pending-order-meta">
+                <div><strong>ORDER TOTAL:</strong> $${Number(orderTotal).toFixed(2)}</div>
+                <div>${order.platform || 'TCGPlayer'}</div>
+              </div>
+            </div>
+            <div class="pending-order-items">
+              ${order.items.map((sale) => `
+                <div class="pending-order-item" id="pending-item-${sale.id}">
+                  <div>
+                    ${sale.image ? 
+                      `<img src="${sale.image}" class="card-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                       <div class="card-image-placeholder" style="display:none;"><i class="fas fa-image"></i></div>` : 
+                      `<div class="card-image-placeholder"><i class="fas fa-image"></i></div>`
+                    }
+                  </div>
+                  <div>
+                    <div class="pending-item-name">${sale.name || 'Unknown Product'}</div>
+                    <div class="pending-item-meta">${sale.condition || 'Unknown'}${sale.set_name ? ` • ${sale.set_name}` : ''}</div>
+                  </div>
+                  <div class="pending-item-qty">x${sale.qty || 1}</div>
+                  <div class="pending-item-actions">
+                    <button class="btn btn-xs btn-secondary" onclick="togglePendingEdit(${sale.id})">Edit</button>
+                    <button class="btn btn-xs btn-success" onclick="confirmSale(${sale.id})">Confirm</button>
+                  </div>
+                </div>
+                <div class="pending-edit-form" id="edit-form-${sale.id}">
+                  <div class="pending-form-grid">
+                    <div class="pending-form-group">
+                      <label>Product Name</label>
+                      <input type="text" value="${sale.name || ''}" 
+                        onchange="updatePendingSale(${sale.id}, 'name', this.value)" 
+                        id="name-${sale.id}">
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Quantity</label>
+                      <input type="number" min="1" value="${sale.qty || 1}" 
+                        onchange="updatePendingSale(${sale.id}, 'qty', parseFloat(this.value))"
+                        id="qty-${sale.id}">
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Your Cost (per item) *</label>
+                      <input type="number" step="0.01" min="0" value="${sale.cost || 0}" 
+                        onchange="updatePendingSale(${sale.id}, 'cost', parseFloat(this.value))" 
+                        placeholder="0.00"
+                        id="cost-${sale.id}">
+                      <small style="color: #718096; margin-top: 4px;">
+                        ${sale.market ? `Cost % of market: ${((sale.cost || 0) / sale.market * 100).toFixed(0)}%` : 'Market: N/A'}
+                      </small>
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Sold Price (per item) *</label>
+                      <input type="number" step="0.01" min="0" value="${sale.sold_price || 0}" 
+                        onchange="updatePendingSale(${sale.id}, 'sold_price', parseFloat(this.value))"
+                        placeholder="${orderTotal ? (orderTotal / order.items.length).toFixed(2) : '0.00'}"
+                        id="price-${sale.id}">
+                      <small style="color: #718096; margin-top: 4px;">
+                        Suggested: $${orderTotal ? (orderTotal / order.items.length).toFixed(2) : '0.00'} 
+                        (Order total ÷ ${order.items.length} items)
+                      </small>
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Condition</label>
+                      <input type="text" value="${sale.condition || 'Unknown'}" 
+                        onchange="updatePendingSale(${sale.id}, 'condition', this.value)"
+                        id="condition-${sale.id}">
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Platform</label>
+                      <select onchange="updatePendingSale(${sale.id}, 'platform', this.value)" id="platform-${sale.id}">
+                        <option value="TCGPlayer" ${sale.platform === 'TCGPlayer' ? 'selected' : ''}>TCGPlayer</option>
+                        <option value="eBay" ${sale.platform === 'eBay' ? 'selected' : ''}>eBay</option>
+                        <option value="Facebook" ${sale.platform === 'Facebook' ? 'selected' : ''}>Facebook</option>
+                        <option value="Other" ${sale.platform === 'Other' ? 'selected' : ''}>Other</option>
+                      </select>
+                    </div>
+                    
+                    <div class="pending-form-group">
+                      <label>Date Sold</label>
+                      <input type="date" value="${sale.sold_date || new Date().toISOString().split('T')[0]}" 
+                        onchange="updatePendingSale(${sale.id}, 'sold_date', this.value)"
+                        id="date-${sale.id}">
+                    </div>
+                  </div>
+                  
+                  <div class="pending-form-actions">
+                    <button class="btn-cancel-edit" onclick="togglePendingEdit(${sale.id})">
+                      <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button class="btn-delete-sale" onclick="deletePendingSale(${sale.id})">
+                      <i class="fas fa-trash"></i> Delete
+                    </button>
+                    <button class="btn-confirm-sale" onclick="confirmSale(${sale.id})">
+                      <i class="fas fa-check"></i> Confirm & Add to Sold Items
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// Toggle expand/collapse for editing
+function togglePendingEdit(id) {
+  const row = document.getElementById(`pending-item-${id}`);
+  const form = document.getElementById(`edit-form-${id}`);
+  
+  if (form && row) {
+    const isExpanded = form.classList.contains('show');
+    
+    if (isExpanded) {
+      form.classList.remove('show');
+      row.classList.remove('expanded');
+    } else {
+      form.classList.add('show');
+      row.classList.add('expanded');
+    }
+  }
+}
+
+// Auto-allocate order total to items based on quantity
+function allocateOrderTotal(orderId) {
+  const orderItems = pendingSales.filter(s => s.order_id === orderId);
+  if (orderItems.length === 0) return;
+  
+  const orderTotal = orderItems[0].order_total || 0;
+  const totalQty = orderItems.reduce((sum, item) => sum + (item.qty || 1), 0);
+  
+  // Allocate proportionally by quantity
+  orderItems.forEach(item => {
+    const proportion = (item.qty || 1) / totalQty;
+    const allocatedPrice = (orderTotal * proportion) / (item.qty || 1); // per item price
+    
+    updatePendingSale(item.id, 'sold_price', allocatedPrice);
+    
+    // Update the input field
+    const input = document.getElementById(`price-${item.id}`);
+    if (input) {
+      input.value = allocatedPrice.toFixed(2);
+    }
+  });
+  
+  showNotification('Order total allocated to items', 'success');
+}
+
+async function updatePendingSale(id, field, value) {
+  try {
+    const sale = pendingSales.find(s => s.id === id);
+    if (!sale) return;
+    
+    sale[field] = value;
+    
+    await fetch('/api/sold/pending/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sale)
+    });
+  } catch (error) {
+    console.error('Error updating sale:', error);
+    showNotification('Error updating sale', 'error');
+  }
+}
+
+async function confirmSale(id) {
+  const sale = pendingSales.find(s => s.id === id);
+  if (!sale) return;
+  
+  // Validate cost is filled in
+  if (!sale.cost || sale.cost === 0) {
+    const confirm = window.confirm('Cost is $0.00. This will affect your profit tracking. Continue anyway?');
+    if (!confirm) return;
+  }
+  
+  try {
+    const response = await fetch('/api/sold/pending/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    
+    const data = await response.json();
+    if (data.status === 'success') {
+      showNotification('✅ Sale confirmed and added to sold items!');
+      loadPendingSales();
+      
+      // Reload sold items from server instead of localStorage
+      await loadSoldItemsFromServer();
+    } else {
+      showNotification(data.message || 'Error confirming sale', 'error');
+    }
+  } catch (error) {
+    console.error('Error confirming sale:', error);
+    showNotification('Error confirming sale', 'error');
+  }
+}
+
+async function deletePendingSale(id) {
+  if (!confirm('Are you sure you want to delete this pending sale?')) return;
+  
+  try {
+    const response = await fetch('/api/sold/pending/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    
+    const data = await response.json();
+    if (data.status === 'success') {
+      showNotification('Pending sale deleted');
+      loadPendingSales();
+    }
+  } catch (error) {
+    console.error('Error deleting sale:', error);
+    showNotification('Error deleting sale', 'error');
+  }
+}
+
+async function scanEmails() {
+  showNotification('📧 Scanning emails and auto-matching with inventory... This may take 30-60 seconds.');
+  
+  try {
+    const response = await fetch('/api/email-scrape', { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification('✅ Email scan complete! Items automatically matched with inventory.');
+      // Wait a bit then reload pending sales
+      setTimeout(() => {
+        loadPendingSales();
+      }, 2000);
+    } else {
+      showNotification(data.message || 'Error scanning emails', 'error');
+    }
+  } catch (error) {
+    console.error('Error scanning emails:', error);
+    showNotification('Error scanning emails', 'error');
+  }
+}
+
+async function autoMatchPending() {
+  showNotification('🔗 Matching pending sales with inventory to retrieve images and details...');
+  
+  try {
+    const response = await fetch('/api/sold/pending/auto-match', { method: 'POST' });
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      showNotification(`✅ ${data.message}`);
+      // Reload pending sales to show updated images
+      setTimeout(() => {
+        loadPendingSales();
+      }, 500);
+    } else {
+      showNotification(data.message || 'Error matching items', 'error');
+    }
+  } catch (error) {
+    console.error('Error auto-matching:', error);
+    showNotification('Error auto-matching items', 'error');
+  }
+}
+
+// Load sold items from server (not localStorage)
+async function loadSoldItemsFromServer() {
+  try {
+    const response = await fetch('/api/sold-items');
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+      soldItems = data.items || [];
+      // Update localStorage for compatibility
+      localStorage.setItem('soldItems', JSON.stringify(soldItems));
+      loadSoldItems();
+    }
+  } catch (error) {
+    console.error('Error loading sold items from server:', error);
+    // Fallback to localStorage
+    loadSoldItems();
+  }
+}
+</script>
+
+</body>
+</html>

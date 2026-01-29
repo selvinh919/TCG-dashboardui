@@ -10,6 +10,8 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
+from difflib import SequenceMatcher
+
 
 app = Flask(__name__)
 
@@ -21,15 +23,12 @@ SYNC_COOLDOWN = 60  # 60 seconds between syncs
 search_cache = {}
 SEARCH_CACHE_TTL = 300
 
+from flask import render_template
+
 @app.route('/')
 def dashboard():
-    """Serve the dashboard HTML"""
-    response = send_file('inventory_dashboard.html')
-    # Prevent caching in browser
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return render_template('inventory_dashboard.html')
+
 
 @app.route('/sync', methods=['POST'])
 def sync():
@@ -218,7 +217,7 @@ def search_products():
                 
                 seen_ids = set()
                 
-                for link in all_links[:30]:  # Check up to 30 links for more results
+                for link in all_links[:60]:  # Check up to 60 links for more results
                     try:
                         href = link.get_attribute('href')
                         if not href:
@@ -341,6 +340,10 @@ def search_products():
                         except:
                             pass
                         
+                        # Fallback to CDN image when missing
+                        if not image_url and product_id:
+                            image_url = f"https://tcgplayer-cdn.tcgplayer.com/product/{product_id}_in_200x200.jpg"
+
                         results.append({
                             'productId': product_id,
                             'name': display_name[:150],
@@ -353,7 +356,7 @@ def search_products():
                         })
                         
                         # Collect more results for better selection
-                        if len(results) >= 15:
+                        if len(results) >= 30:
                             break
                     
                     except Exception as e:
@@ -410,7 +413,7 @@ def get_pending_sales():
     except FileNotFoundError:
         return jsonify({'status': 'success', 'sales': []})
 
-@app.route('/api/settings')
+@app.route('/api/settings', methods=['GET'])
 def get_settings():
     """Return settings data"""
     try:
@@ -450,6 +453,661 @@ def mark_added():
     except Exception as e:
         print(f"[ERROR] Mark added failed: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/email-scrape', methods=['POST'])
+def email_scrape():
+    """Trigger email scraping for sold orders"""
+    try:
+        def run_email_scrape():
+            try:
+                python_exe = os.path.join(os.path.dirname(__file__), '.venv', 'Scripts', 'python.exe')
+                if not os.path.exists(python_exe):
+                    python_exe = 'python'
+                
+                print("[EMAIL_SCRAPE] Starting email scraper...")
+                result = subprocess.run([python_exe, 'email_scraper.py'], 
+                                      capture_output=True, 
+                                      text=True,
+                                      cwd=os.path.dirname(__file__))
+                
+                if result.returncode == 0:
+                    print("[EMAIL_SCRAPE] Complete!")
+                    # Automatically run auto-match after scraping
+                    print("[EMAIL_SCRAPE] Auto-matching with inventory...")
+                    auto_match_pending_sales_internal()
+                else:
+                    print(f"[ERROR] Email scraper failed: {result.stderr}")
+                    
+            except Exception as e:
+                print(f"[ERROR] Email scrape failed: {e}")
+        
+        thread = threading.Thread(target=run_email_scrape, daemon=True)
+        thread.start()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Email scraping started... Check pending sales in a few moments.'
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sold/pending', methods=['GET'])
+def get_pending_sales_api():
+    """Get pending sales that need confirmation"""
+    try:
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            sales = json.load(f)
+
+        # Auto-enrich pending sales with inventory metadata (images, tcg_product_id)
+        if sales and os.path.exists('state.json'):
+            with open('state.json', 'r', encoding='utf-8') as f:
+                inventory = json.load(f)
+            if enrich_items_with_inventory(sales, inventory):
+                with open('pending_sales.json', 'w', encoding='utf-8') as f:
+                    json.dump(sales, f, indent=2)
+
+        return jsonify({'status': 'success', 'sales': sales})
+    except FileNotFoundError:
+        return jsonify({'status': 'success', 'sales': []})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sold/pending/update', methods=['POST'])
+def update_pending_sale():
+    """Update a pending sale (edit details before confirming)"""
+    try:
+        data = request.json
+        sale_id = data.get('id')
+        
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            sales = json.load(f)
+        
+        for sale in sales:
+            if sale.get('id') == sale_id:
+                sale.update({
+                    'name': data.get('name', sale.get('name')),
+                    'qty': data.get('qty', sale.get('qty')),
+                    'sold_price': data.get('sold_price', sale.get('sold_price')),
+                    'cost': data.get('cost', sale.get('cost')),
+                    'platform': data.get('platform', sale.get('platform')),
+                    'sold_date': data.get('sold_date', sale.get('sold_date'))
+                })
+                break
+        
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(sales, f, indent=2)
+        
+        return jsonify({'status': 'success', 'message': 'Sale updated'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sold/pending/confirm', methods=['POST'])
+def confirm_pending_sale():
+    """Confirm a pending sale and move it to sold items"""
+    try:
+        data = request.json
+        sale_id = data.get('id')
+        
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            pending_sales = json.load(f)
+        
+        confirmed_sale = None
+        remaining_sales = []
+        for sale in pending_sales:
+            if sale.get('id') == sale_id:
+                confirmed_sale = sale.copy()  # Make a copy to preserve all data
+                confirmed_sale['confirmed'] = True
+                # Ensure image and tcg_product_id are preserved
+                if not confirmed_sale.get('image'):
+                    confirmed_sale['image'] = None
+                if not confirmed_sale.get('tcg_product_id'):
+                    confirmed_sale['tcg_product_id'] = None
+            else:
+                remaining_sales.append(sale)
+        
+        if not confirmed_sale:
+            return jsonify({'status': 'error', 'message': 'Sale not found'}), 404
+        
+        sold_file = 'sold_items.json'
+        sold_items = []
+        if os.path.exists(sold_file):
+            with open(sold_file, 'r', encoding='utf-8') as f:
+                try:
+                    sold_items = json.load(f)
+                except:
+                    sold_items = []
+        
+        sold_items.append(confirmed_sale)
+        
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(remaining_sales, f, indent=2)
+        
+        with open(sold_file, 'w', encoding='utf-8') as f:
+            json.dump(sold_items, f, indent=2)
+        
+        return jsonify({'status': 'success', 'message': 'Sale confirmed and moved to sold items'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sold/pending/delete', methods=['POST'])
+def delete_pending_sale():
+    """Delete a pending sale"""
+    try:
+        data = request.json
+        sale_id = data.get('id')
+        
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            sales = json.load(f)
+        
+        sales = [s for s in sales if s.get('id') != sale_id]
+        
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(sales, f, indent=2)
+        
+        return jsonify({'status': 'success', 'message': 'Sale deleted'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/sold-items', methods=['GET'])
+def get_sold_items():
+    """Get all confirmed sold items"""
+    try:
+        with open('sold_items.json', 'r', encoding='utf-8') as f:
+            items = json.load(f)
+
+        # Auto-enrich sold items with inventory metadata (images, tcg_product_id)
+        if items and os.path.exists('state.json'):
+            with open('state.json', 'r', encoding='utf-8') as f:
+                inventory = json.load(f)
+            if enrich_items_with_inventory(items, inventory):
+                with open('sold_items.json', 'w', encoding='utf-8') as f:
+                    json.dump(items, f, indent=2)
+        
+        total_revenue = sum(item.get('sold_price', 0) * item.get('qty', 1) for item in items)
+        total_cost = sum(item.get('cost', 0) * item.get('qty', 1) for item in items)
+        total_profit = total_revenue - total_cost
+        
+        return jsonify({
+            'status': 'success',
+            'items': items,
+            'totals': {
+                'revenue': total_revenue,
+                'cost': total_cost,
+                'profit': total_profit
+            }
+        })
+    except FileNotFoundError:
+        return jsonify({
+            'status': 'success',
+            'items': [],
+            'totals': {'revenue': 0, 'cost': 0, 'profit': 0}
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    """Save settings including email credentials"""
+    try:
+        settings = request.json
+        with open('settings.json', 'w', encoding='utf-8') as f:
+            json.dump(settings, f, indent=2)
+        return jsonify({'status': 'success', 'message': 'Settings saved'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+def fuzzy_match_score(str1, str2):
+    """Calculate similarity score between two strings (0-1)"""
+    return SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+
+def enrich_items_with_inventory(items, inventory, min_score=0.9):
+    """Fill missing image/tcg fields on pending/sold items by matching inventory."""
+    updated = False
+    for item in items:
+        if item.get('image') and item.get('tcg_product_id'):
+            continue
+
+        # 1) Exact product ID match if present
+        item_pid = item.get('tcg_product_id')
+        if item_pid:
+            exact = next((inv for inv in inventory if str(inv.get('tcg_product_id')) == str(item_pid)), None)
+            if exact:
+                if not item.get('image'):
+                    item['image'] = exact.get('image')
+                    updated = True
+                if not item.get('set_name'):
+                    item['set_name'] = exact.get('set_name')
+                    updated = True
+                if not item.get('card_number'):
+                    item['card_number'] = exact.get('card_number')
+                    updated = True
+                if not item.get('market'):
+                    item['market'] = exact.get('market')
+                    updated = True
+                continue
+
+        # 2) Set + card number match if present
+        item_set = (item.get('set_name') or '').strip().lower()
+        item_num = (item.get('card_number') or '').strip().lower()
+        if item_set and item_num:
+            exact = next(
+                (inv for inv in inventory
+                 if (inv.get('set_name') or '').strip().lower() == item_set
+                 and (inv.get('card_number') or '').strip().lower() == item_num),
+                None
+            )
+            if exact:
+                if not item.get('image'):
+                    item['image'] = exact.get('image')
+                    updated = True
+                if not item.get('tcg_product_id'):
+                    item['tcg_product_id'] = exact.get('tcg_product_id')
+                    updated = True
+                if not item.get('market'):
+                    item['market'] = exact.get('market')
+                    updated = True
+                continue
+
+        # 3) Fuzzy match by name with higher threshold
+        item_name = (item.get('name') or item.get('display_name') or '').strip()
+        if not item_name:
+            continue
+
+        best_match = None
+        best_score = 0
+        for inv in inventory:
+            inv_name = (inv.get('display_name') or inv.get('name') or '').strip()
+            if not inv_name:
+                continue
+            score = fuzzy_match_score(item_name, inv_name)
+            if score > best_score:
+                best_score = score
+                best_match = inv
+
+        if best_match and best_score >= min_score:
+            if not item.get('image'):
+                item['image'] = best_match.get('image')
+                updated = True
+            if not item.get('tcg_product_id'):
+                item['tcg_product_id'] = best_match.get('tcg_product_id')
+                updated = True
+            if not item.get('set_name'):
+                item['set_name'] = best_match.get('set_name')
+                updated = True
+            if not item.get('card_number'):
+                item['card_number'] = best_match.get('card_number')
+                updated = True
+            if not item.get('market'):
+                item['market'] = best_match.get('market')
+                updated = True
+
+    return updated
+
+@app.route('/api/sold/pending/match-inventory', methods=['POST'])
+def match_pending_with_inventory():
+    """
+    Match a pending sale with inventory items
+    Returns potential matches from current inventory
+    """
+    try:
+        data = request.json
+        sale_name = data.get('name', '')
+        
+        # Load current inventory
+        if not os.path.exists('state.json'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Inventory not initialized. Run sync first.'
+            }), 400
+
+        with open('state.json', 'r', encoding='utf-8') as f:
+            inventory = json.load(f)
+        
+        # Find matches
+        matches = []
+        for item in inventory:
+            item_name = item.get('name', '')
+            
+            # Calculate similarity
+            score = fuzzy_match_score(sale_name, item_name)
+            
+            # Include if score > 0.7 or exact match
+            if score > 0.7:
+                matches.append({
+                    'score': round(score, 2),
+                    'inventory_item': item,
+                    'match_type': 'exact' if score > 0.95 else 'fuzzy'
+                })
+        
+        # Sort by score descending
+        matches.sort(key=lambda x: x['score'], reverse=True)
+        
+        return jsonify({
+            'status': 'success',
+            'matches': matches[:5]  # Return top 5 matches
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+def auto_match_pending_sales_internal():
+    """Internal function to auto-match pending sales with inventory"""
+    try:
+        # Load pending sales
+        if not os.path.exists('pending_sales.json'):
+            return 0
+            
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            pending_sales = json.load(f)
+        
+        # Load inventory
+        if not os.path.exists('state.json'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Inventory not initialized. Run sync first.'
+            }), 400
+
+        with open('state.json', 'r', encoding='utf-8') as f:
+            inventory = json.load(f)
+        
+        match_count = 0
+        
+        for sale in pending_sales:
+            if sale.get('matched'):
+                continue  # Skip already matched
+            
+            sale_name = sale.get('name', '')
+            best_match = None
+            best_score = 0
+            
+            # Find best match
+            for item in inventory:
+                item_name = item.get('name', '')
+                score = fuzzy_match_score(sale_name, item_name)
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = item
+            
+            # If good match found (>80% similarity)
+            if best_match and best_score > 0.8:
+                # Update sale with inventory data
+                sale['matched'] = True
+                sale['match_score'] = round(best_score, 2)
+                sale['tcg_product_id'] = best_match.get('tcg_product_id')
+                sale['image'] = best_match.get('image')
+                sale['set_name'] = best_match.get('set_name')
+                sale['card_number'] = best_match.get('card_number')
+                sale['market'] = best_match.get('market')
+                
+                # If inventory has cost, use it
+                if best_match.get('cost'):
+                    sale['cost'] = best_match.get('cost')
+                
+                # If inventory has price, use as guide for sold_price
+                if sale.get('sold_price', 0) == 0 and best_match.get('price'):
+                    sale['suggested_price'] = best_match.get('price')
+                
+                match_count += 1
+        
+        # Save updated pending sales
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(pending_sales, f, indent=2)
+        
+        print(f"[AUTO_MATCH] Matched {match_count} items with inventory")
+        return match_count
+        
+    except Exception as e:
+        print(f"[ERROR] Auto-match failed: {e}")
+        return 0
+
+@app.route('/api/sold/pending/auto-match', methods=['POST'])
+def auto_match_pending_sales():
+    """
+    Automatically match all pending sales with inventory
+    Updates pending sales with inventory data
+    """
+    try:
+        match_count = auto_match_pending_sales_internal()
+        return jsonify({
+            'status': 'success',
+            'message': f'Matched {match_count} items with inventory',
+            'matched_count': match_count
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/sold/pending/allocate-price', methods=['POST'])
+def allocate_order_price():
+    """
+    Auto-allocate order total to items based on market prices
+    """
+    try:
+        data = request.json
+        order_id = data.get('order_id')
+        
+        if not order_id:
+            return jsonify({'status': 'error', 'message': 'Order ID required'}), 400
+        
+        # Load pending sales
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            pending_sales = json.load(f)
+        
+        # Find all items for this order
+        order_items = [s for s in pending_sales if s.get('order_id') == order_id]
+        
+        if not order_items:
+            return jsonify({'status': 'error', 'message': 'No items found for order'}), 404
+        
+        # Get order total
+        order_total = order_items[0].get('order_total', 0)
+        
+        if order_total == 0:
+            return jsonify({'status': 'error', 'message': 'Order total is 0'}), 400
+        
+        # Calculate total market value
+        total_market = sum(item.get('market', 0) for item in order_items)
+        
+        if total_market == 0:
+            # Equal split if no market prices
+            price_per_item = order_total / len(order_items)
+            for item in order_items:
+                item['sold_price'] = round(price_per_item, 2)
+        else:
+            # Proportional split based on market prices
+            for item in order_items:
+                market_value = item.get('market', 0)
+                proportion = market_value / total_market
+                item['sold_price'] = round(order_total * proportion, 2)
+        
+        # Save updated pending sales
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(pending_sales, f, indent=2)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Allocated ${order_total} to {len(order_items)} items'
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/sold/pending/confirm-with-inventory-update', methods=['POST'])
+def confirm_sale_and_update_inventory():
+    """
+    Confirm a pending sale AND update inventory (decrement qty or remove)
+    """
+    try:
+        data = request.json
+        sale_id = data.get('id')
+        update_inventory = data.get('update_inventory', True)
+        
+        # Load pending sales
+        with open('pending_sales.json', 'r', encoding='utf-8') as f:
+            pending_sales = json.load(f)
+        
+        # Find the sale
+        confirmed_sale = None
+        remaining_sales = []
+        for sale in pending_sales:
+            if sale.get('id') == sale_id:
+                confirmed_sale = sale
+                confirmed_sale['confirmed'] = True
+            else:
+                remaining_sales.append(sale)
+        
+        if not confirmed_sale:
+            return jsonify({'status': 'error', 'message': 'Sale not found'}), 404
+        
+        # Update inventory if requested
+        if not os.path.exists('state.json'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Inventory not initialized. Run sync first.'
+            }), 400
+        if update_inventory and confirmed_sale.get('matched'):
+            with open('state.json', 'r', encoding='utf-8') as f:
+                inventory = json.load(f)
+            
+            # Find matching inventory item
+            sale_name = confirmed_sale.get('name', '')
+            for i, item in enumerate(inventory):
+                if fuzzy_match_score(sale_name, item.get('name', '')) > 0.8:
+                    # Decrement quantity
+                    current_qty = item.get('qty', 1)
+                    sold_qty = confirmed_sale.get('qty', 1)
+                    new_qty = max(0, current_qty - sold_qty)
+                    
+                    if new_qty == 0:
+                        # Remove from inventory
+                        inventory.pop(i)
+                    else:
+                        # Update quantity
+                        inventory[i]['qty'] = new_qty
+                    
+                    break
+            
+            # Save updated inventory
+            with open('state.json', 'w', encoding='utf-8') as f:
+                json.dump(inventory, f, indent=2)
+        
+        # Add to sold items
+        sold_file = 'sold_items.json'
+        sold_items = []
+        if os.path.exists(sold_file):
+            with open(sold_file, 'r', encoding='utf-8') as f:
+                try:
+                    sold_items = json.load(f)
+                except:
+                    sold_items = []
+        
+        # Calculate profit
+        sold_price = confirmed_sale.get('sold_price', 0)
+        cost = confirmed_sale.get('cost', 0)
+        qty = confirmed_sale.get('qty', 1)
+        confirmed_sale['profit'] = round((sold_price - cost) * qty, 2)
+        
+        sold_items.append(confirmed_sale)
+        
+        # Save files
+        with open('pending_sales.json', 'w', encoding='utf-8') as f:
+            json.dump(remaining_sales, f, indent=2)
+        
+        with open(sold_file, 'w', encoding='utf-8') as f:
+            json.dump(sold_items, f, indent=2)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Sale confirmed and inventory updated',
+            'inventory_updated': update_inventory
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/sold/stats', methods=['GET'])
+def get_sold_stats():
+    """
+    Get statistics for sold items
+    """
+    try:
+        # Load sold items
+        sold_file = 'sold_items.json'
+        if not os.path.exists(sold_file):
+            return jsonify({
+                'status': 'success',
+                'stats': {
+                    'total_items': 0,
+                    'total_revenue': 0,
+                    'total_cost': 0,
+                    'total_profit': 0,
+                    'avg_profit_margin': 0
+                }
+            })
+        
+        with open(sold_file, 'r', encoding='utf-8') as f:
+            sold_items = json.load(f)
+        
+        total_items = len(sold_items)
+        total_revenue = sum(item.get('sold_price', 0) * item.get('qty', 1) for item in sold_items)
+        total_cost = sum(item.get('cost', 0) * item.get('qty', 1) for item in sold_items)
+        total_profit = total_revenue - total_cost
+        avg_profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
+        
+        # Group by platform
+        platform_stats = {}
+        for item in sold_items:
+            platform = item.get('platform', 'Unknown')
+            if platform not in platform_stats:
+                platform_stats[platform] = {'count': 0, 'revenue': 0}
+            platform_stats[platform]['count'] += item.get('qty', 1)
+            platform_stats[platform]['revenue'] += item.get('sold_price', 0) * item.get('qty', 1)
+        
+        # Recent sales (last 30 days)
+        from datetime import datetime, timedelta
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        recent_sales = [
+            item for item in sold_items 
+            if item.get('sold_date', '') >= thirty_days_ago
+        ]
+        recent_revenue = sum(item.get('sold_price', 0) * item.get('qty', 1) for item in recent_sales)
+        
+        return jsonify({
+            'status': 'success',
+            'stats': {
+                'total_items': total_items,
+                'total_revenue': round(total_revenue, 2),
+                'total_cost': round(total_cost, 2),
+                'total_profit': round(total_profit, 2),
+                'avg_profit_margin': round(avg_profit_margin, 2),
+                'platform_stats': platform_stats,
+                'recent_sales_30d': len(recent_sales),
+                'recent_revenue_30d': round(recent_revenue, 2)
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# Add this helper function at module level
+def init_enhanced_endpoints(flask_app):
+    """
+    Initialize all enhanced endpoints
+    Call this from your main server.py after app is created
+    """
+    # All endpoints are already decorated above
+    pass
+
 
 if __name__ == '__main__':
     print("=" * 60)

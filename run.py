@@ -79,7 +79,7 @@ for sale in events["sales"]:
     send(
         DISCORD_WEBHOOK,
         "🧾 ITEM SOLD",
-        f"{sale['name']}\nQty: {sale['old_qty']} → {sale['new_qty']}",
+        f"{sale['name']}\nQty: {sale.get('qty', 'N/A')}",
         3066993
     )
 
